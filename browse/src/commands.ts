@@ -48,7 +48,11 @@ export const PAGE_CONTENT_COMMANDS = new Set([
 
 /** Wrap output from untrusted-content commands with trust boundary markers */
 export function wrapUntrustedContent(result: string, url: string): string {
-  return `--- BEGIN UNTRUSTED EXTERNAL CONTENT (source: ${url}) ---\n${result}\n--- END UNTRUSTED EXTERNAL CONTENT ---`;
+  // Sanitize URL: remove newlines to prevent marker injection via history.pushState
+  const safeUrl = url.replace(/[\n\r]/g, '').slice(0, 200);
+  // Escape marker strings in content to prevent boundary escape attacks
+  const safeResult = result.replace(/--- (BEGIN|END) UNTRUSTED EXTERNAL CONTENT/g, '--- $1 UNTRUSTED EXTERNAL C\u200BONTENT');
+  return `--- BEGIN UNTRUSTED EXTERNAL CONTENT (source: ${safeUrl}) ---\n${safeResult}\n--- END UNTRUSTED EXTERNAL CONTENT ---`;
 }
 
 export const COMMAND_DESCRIPTIONS: Record<string, { category: string; description: string; usage?: string }> = {

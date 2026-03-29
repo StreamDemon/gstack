@@ -291,7 +291,7 @@ export async function handleMetaCommand(
         }
       }
 
-      return output.join('\n');
+      return wrapUntrustedContent(output.join('\n'), `diff: ${url1} vs ${url2}`);
     }
 
     // ─── Snapshot ─────────────────────────────────────
@@ -310,7 +310,7 @@ export async function handleMetaCommand(
       bm.resume();
       // Re-snapshot to capture current page state after human interaction
       const snapshot = await handleSnapshot(['-i'], bm);
-      return `RESUMED\n${snapshot}`;
+      return `RESUMED\n${wrapUntrustedContent(snapshot, bm.getCurrentUrl())}`;
     }
 
     // ─── Headed Mode ──────────────────────────────────────
@@ -381,11 +381,14 @@ export async function handleMetaCommand(
         if (!bm.isWatching()) return 'Not currently watching.';
         const result = bm.stopWatch();
         const durationSec = Math.round(result.duration / 1000);
+        const lastSnapshot = result.snapshots.length > 0
+          ? wrapUntrustedContent(result.snapshots[result.snapshots.length - 1], bm.getCurrentUrl())
+          : '(none)';
         return [
           `WATCH STOPPED (${durationSec}s, ${result.snapshots.length} snapshots)`,
           '',
           'Last snapshot:',
-          result.snapshots.length > 0 ? result.snapshots[result.snapshots.length - 1] : '(none)',
+          lastSnapshot,
         ].join('\n');
       }
 
