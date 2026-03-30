@@ -67,6 +67,11 @@ describeIfSelected('Learnings E2E', ['learnings-show'], () => {
         insight: 'User wants rubocop to run before every commit, no exceptions.',
         confidence: 10, source: 'user-stated', ts: new Date().toISOString(),
       },
+      {
+        skill: 'qa', type: 'operational', key: 'test-timeout-flag',
+        insight: 'bun test requires --timeout 30000 for E2E tests in this project.',
+        confidence: 9, source: 'observed', ts: new Date().toISOString(),
+      },
     ];
 
     fs.writeFileSync(
