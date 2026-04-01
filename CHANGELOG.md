@@ -1,25 +1,58 @@
 # Changelog
 
-## [0.14.6.0] - 2026-03-31 — GStack Browser: Double-Click AI Browser
+## [0.15.1.0] - 2026-04-01 — GStack Browser: AI-Controlled Chromium
 
-GStack Browser is a macOS .app you can double-click to launch an AI-controlled browser. Chromium opens with the sidebar baked in, Claude Code ready to go. No terminal needed. Sites like Google and NYTimes work without captchas because the browser now has anti-bot stealth patches. The menu bar says "GStack Browser" instead of "Google Chrome for Testing."
+GStack Browser is an AI-controlled Chromium with the sidebar baked in, anti-bot stealth, and custom branding. Sites like Google and NYTimes work without captchas. The menu bar says "GStack Browser" instead of "Chrome for Testing." Run `/open-gstack-browser` from Claude Code and you're in.
 
 ### Added
 
-- **GStack Browser.app.** `scripts/build-app.sh` creates a self-contained .app bundle (389MB, 189MB DMG). Bundles the compiled browse binary, Playwright's Chromium, and the sidebar extension. Launches in ~5 seconds on Apple Silicon.
-- **Dev mode launcher.** `scripts/app/gstack-browser` works in two modes: inside the .app bundle (uses bundled resources) or dev mode (uses your global gstack install). Same script, zero config.
 - **Anti-bot stealth.** `navigator.webdriver` is now `false`. Fake plugins array (3 entries, like real Chrome). Proper `navigator.languages`. CDP artifact cleanup. Permissions API returns `prompt` not `denied`. Sites that blocked "Chrome for Testing" now work normally.
 - **Custom user agent.** `Chrome/<version> Safari/537.36 GStackBrowser`. Auto-detects Chrome version from the binary. No more "Chrome for Testing" in the UA string.
-- **Chromium rebranding.** Menu bar, Dock, and Cmd+Tab all show "GStack Browser" instead of "Google Chrome for Testing". Patched at launch time (dev mode) and build time (.app bundle).
-- **Auth via /health.** Extension reads auth token from the browse server's `/health` endpoint instead of `.auth.json` file. Fixes codesigning and read-only .app bundle issues.
-- **GSTACK_CHROMIUM_PATH env var.** Point Playwright at any Chromium binary. Used by the .app launcher.
-- **BROWSE_EXTENSIONS_DIR env var.** Override extension path. Used by the .app bundle.
-- **GStack Browser V0 design doc.** `docs/designs/GSTACK_BROWSER_V0.md` covers the full 5-phase roadmap, 9 capability visions, Chromium fork trigger criteria, competitive landscape, and architecture.
+- **Chromium rebranding.** Menu bar, Dock, and Cmd+Tab all show "GStack Browser" instead of "Google Chrome for Testing". Patched at launch time.
+- **Auth via /health.** Extension reads auth token from the browse server's `/health` endpoint instead of `.auth.json` file. Fixes codesigning and read-only bundle issues.
+- **`/open-gstack-browser` skill.** Replaces `/connect-chrome`. Same functionality, better name. `/connect-chrome` still works as a backwards-compatible alias.
+- **Welcome page.** GStack Browser opens with a "Welcome to GStack Browser" page explaining what the sidebar can do. Auto-hides when the extension is detected.
+- **Left-aligned sidebar UI.** All sidebar text (chat welcome, loading, empty states, inspector) is now left-aligned instead of centered.
+- **GStack Browser V0 design doc.** `docs/designs/GSTACK_BROWSER_V0.md` covers the full 5-phase roadmap from app wrapper through Chromium fork.
 
 ### Changed
 
 - **Extension auth bootstrap.** `background.js` now reads token from `/health` instead of `chrome.runtime.getURL('.auth.json')`. Simpler, works everywhere.
-- **Security test updated.** `server-auth.test.ts` updated to verify token IS present in `/health` (localhost-only, safe) instead of verifying it was removed.
+- **Renamed `/connect-chrome` to `/open-gstack-browser`.** All references updated across README, docs, extension UI. Symlink preserved for backwards compatibility.
+
+## [0.15.0.0] - 2026-04-01 — Session Intelligence
+
+Your AI sessions now remember what happened. Plans, reviews, checkpoints, and health scores survive context compaction and compound across sessions. Every skill writes a timeline event, and the preamble reads recent artifacts on startup so the agent knows where you left off.
+
+### Added
+
+- **Session timeline.** Every skill auto-logs start/complete events to `timeline.jsonl`. Local-only, never sent anywhere, always on regardless of telemetry setting. /retro can now show "this week: 3 /review, 2 /ship across 3 branches."
+- **Context recovery.** After compaction or session start, the preamble lists your recent CEO plans, checkpoints, and reviews. The agent reads the most recent one to recover decisions and progress without asking you to repeat yourself.
+- **Cross-session injection.** On session start, the preamble prints your last skill run on this branch and your latest checkpoint. You see "Last session: /review (success)" before typing anything.
+- **Predictive skill suggestion.** If your last 3 sessions on a branch follow a pattern (review, ship, review), gstack suggests what you probably want next.
+- **Welcome back message.** Sessions synthesize a one-paragraph briefing: branch name, last skill, checkpoint status, health score.
+- **`/checkpoint` skill.** Save and resume working state snapshots. Captures git state, decisions made, remaining work. Supports cross-branch listing for Conductor workspace handoff between agents.
+- **`/health` skill.** Code quality scorekeeper. Wraps your project's tools (tsc, biome, knip, shellcheck, tests), computes a composite 0-10 score, tracks trends over time. When the score drops, it tells you exactly what changed and where to fix it.
+- **Timeline binaries.** `bin/gstack-timeline-log` and `bin/gstack-timeline-read` for append-only JSONL timeline storage.
+- **Routing rules.** /checkpoint and /health added to the skill routing injection.
+
+## [0.14.6.0] - 2026-03-31 — Recursive Self-Improvement
+
+gstack now learns from its own mistakes. Every skill session captures operational failures (CLI errors, wrong approaches, project quirks) and surfaces them in future sessions. No setup needed, just works.
+
+### Added
+
+- **Operational self-improvement.** When a command fails or you hit a project-specific gotcha, gstack logs it. Next session, it remembers. "bun test needs --timeout 30000" or "login flow requires cookie import first" ... the kind of stuff that wastes 10 minutes every time you forget it.
+- **Learnings summary in preamble.** When your project has 5+ learnings, gstack shows the top 3 at the start of every session so you see them before you start working.
+- **13 skills now learn.** office-hours, plan-ceo-review, plan-eng-review, plan-design-review, design-review, design-consultation, cso, qa, qa-only, and retro all now read prior learnings AND contribute new ones. Previously only review, ship, and investigate were wired.
+
+### Changed
+
+- **Contributor mode replaced.** The old contributor mode (manual opt-in, markdown reports to ~/.gstack/contributor-logs/) never fired in 18 days of heavy use. Replaced with automatic operational learning that captures the same insights without any setup.
+
+### Fixed
+
+- **learnings-show E2E test slug mismatch.** The test seeded learnings at a hardcoded path but gstack-slug computed a different path at runtime. Now computes the slug dynamically.
 
 ## [0.14.5.0] - 2026-03-31 — Ship Idempotency + Skill Prefix Fix
 
