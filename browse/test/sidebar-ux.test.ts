@@ -1630,13 +1630,13 @@ describe('cookie import button (sidebar)', () => {
   const html = fs.readFileSync(path.join(ROOT, '..', 'extension', 'sidepanel.html'), 'utf-8');
   const js = fs.readFileSync(path.join(ROOT, '..', 'extension', 'sidepanel.js'), 'utf-8');
 
-  test('sidebar footer has cookies button', () => {
-    expect(html).toContain('id="copy-cookies"');
-    expect(html).toContain('cookies');
+  test('quick actions toolbar has cookies button', () => {
+    expect(html).toContain('id="chat-cookies-btn"');
+    expect(html).toContain('Cookies');
   });
 
   test('cookies button navigates to cookie-picker', () => {
-    expect(js).toContain("'copy-cookies'");
+    expect(js).toContain("'chat-cookies-btn'");
     expect(js).toContain('cookie-picker');
   });
 });

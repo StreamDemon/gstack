@@ -660,7 +660,7 @@ document.getElementById('reload-sidebar').addEventListener('click', () => {
 });
 
 // ─── Copy Cookies ───────────────────────────────────────────────
-document.getElementById('copy-cookies').addEventListener('click', async () => {
+document.getElementById('chat-cookies-btn').addEventListener('click', async () => {
   if (!serverUrl) return;
   // Navigate the browser to the cookie picker page hosted by the browse server
   try {
