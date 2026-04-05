@@ -465,11 +465,15 @@ export function generateInstructionBlock(opts: InstructionBlockOptions): string 
 
   return `\
 ${'='.repeat(59)}
- REMOTE BROWSER ACCESS — paste this into your other agent
+ REMOTE BROWSER ACCESS
+ Paste this into your other AI agent's chat.
 ${'='.repeat(59)}
 
-You have access to a remote browser controlled via HTTP API.
-This setup key expires in 5 minutes.
+You can control a real Chromium browser via HTTP API. Navigate
+pages, read content, click buttons, fill forms, take screenshots.
+You get your own isolated tab. This setup key expires in 5 minutes.
+
+SERVER: ${serverUrl}
 
 STEP 1 — Exchange the setup key for a session token:
 
@@ -478,50 +482,59 @@ STEP 1 — Exchange the setup key for a session token:
     -d '{"setup_key": "${setupKey}"}' \\
     ${serverUrl}/connect
 
-  You'll get back: {"token": "gsk_sess_...", "expires": "...", "scopes": [...]}
-  Save that token. Use it for all subsequent requests.
+  Save the "token" value from the response. Use it as your
+  Bearer token for all subsequent requests.
 
-STEP 2 — Create your own tab:
+STEP 2 — Create your own tab (required before interacting):
 
   curl -s -X POST \\
-    -H "Authorization: Bearer <your-session-token>" \\
+    -H "Authorization: Bearer <TOKEN>" \\
     -H "Content-Type: application/json" \\
     -d '{"command": "newtab", "args": ["https://example.com"]}' \\
     ${serverUrl}/command
 
-  You'll get back: {"tabId": N, ...}
-  Include "tabId": N in all subsequent commands.
+  Save the "tabId" from the response. Include it in every command.
 
-STEP 3 — Use the browser. Send commands as POST /command:
+STEP 3 — Browse. The key pattern is snapshot then act:
 
+  # Get an interactive snapshot with clickable @ref labels
   curl -s -X POST \\
-    -H "Authorization: Bearer <your-session-token>" \\
+    -H "Authorization: Bearer <TOKEN>" \\
     -H "Content-Type: application/json" \\
-    -d '{"command": "snapshot", "args": ["-i"], "tabId": <your-tab-id>}' \\
+    -d '{"command": "snapshot", "args": ["-i"], "tabId": <TAB>}' \\
     ${serverUrl}/command
 
-AVAILABLE COMMANDS:
+  The snapshot returns labeled elements like:
+    @e1 [link] "Home"
+    @e2 [button] "Sign In"
+    @e3 [input] "Search..."
+
+  Use those @refs to interact:
+    {"command": "click", "args": ["@e2"], "tabId": <TAB>}
+    {"command": "fill", "args": ["@e3", "query"], "tabId": <TAB>}
+
+  Always snapshot first, then use the @refs. Don't guess selectors.
+
+COMMAND REFERENCE:
   Navigate:    {"command": "goto", "args": ["URL"], "tabId": N}
-  Read page:   {"command": "snapshot", "args": ["-i"], "tabId": N}
+  Snapshot:    {"command": "snapshot", "args": ["-i"], "tabId": N}
   Full text:   {"command": "text", "args": [], "tabId": N}
-  Screenshot:  {"command": "screenshot", "args": ["/tmp/screen.png"], "tabId": N}
+  Screenshot:  {"command": "screenshot", "args": ["/tmp/s.png"], "tabId": N}
   Click:       {"command": "click", "args": ["@e3"], "tabId": N}
   Fill form:   {"command": "fill", "args": ["@e5", "value"], "tabId": N}
   Go back:     {"command": "back", "args": [], "tabId": N}
-  List tabs:   {"command": "tabs", "args": []}
+  Tabs:        {"command": "tabs", "args": []}
+  New tab:     {"command": "newtab", "args": ["URL"]}
 
-SCOPES: This token has ${scopeDesc}.
-${scopes.includes('admin') ? '' : `To request admin access, ask the user to re-run pair-agent with --admin.\n`}
-SESSION: Token expires ${expiresAt}. The user can revoke it
-anytime with: $B tunnel revoke <your-agent-name>
+SCOPES: ${scopeDesc}.
+${scopes.includes('admin') ? '' : `To get admin access (JS, cookies, storage), ask the user to re-pair with --admin.\n`}
+TOKEN: Expires ${expiresAt}. Revoke: ask the user to run
+  $B tunnel revoke <your-name>
 
-IF SOMETHING GOES WRONG:
-  401 Unauthorized → Token expired or revoked. Ask the user
-    to run pair-agent again.
-  403 Forbidden → Command not in your scope, or tab not owned
-    by you. Use newtab first.
-  429 Too Many Requests → Sending > 10 requests/second.
-    Wait for the Retry-After header.
+ERRORS:
+  401 → Token expired/revoked. Ask user to run /pair-agent again.
+  403 → Command out of scope, or tab not yours. Run newtab first.
+  429 → Rate limited (>10 req/s). Wait for Retry-After header.
 
 ${'='.repeat(59)}`;
 }

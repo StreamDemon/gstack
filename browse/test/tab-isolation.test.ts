@@ -82,9 +82,10 @@ describe('generateInstructionBlock', () => {
     expect(block).toContain('STEP 1');
     expect(block).toContain('STEP 2');
     expect(block).toContain('STEP 3');
-    expect(block).toContain('AVAILABLE COMMANDS');
+    expect(block).toContain('COMMAND REFERENCE');
     expect(block).toContain('read + write access');
     expect(block).toContain('tabId');
+    expect(block).toContain('@ref');
     expect(block).not.toContain('undefined');
   });
 
@@ -109,7 +110,7 @@ describe('generateInstructionBlock', () => {
 
     expect(block).toContain('admin access');
     expect(block).toContain('execute JS');
-    expect(block).not.toContain('To request admin access');
+    expect(block).not.toContain('re-pair with --admin');
   });
 
   it('shows re-pair hint when admin not included', () => {
@@ -120,7 +121,7 @@ describe('generateInstructionBlock', () => {
       expiresAt: '2026-04-06T00:00:00Z',
     });
 
-    expect(block).toContain('To request admin access');
+    expect(block).toContain('re-pair with --admin');
   });
 
   it('includes newtab as step 2 (agents must own their tab)', () => {
@@ -143,8 +144,8 @@ describe('generateInstructionBlock', () => {
       expiresAt: '2026-04-06T00:00:00Z',
     });
 
-    expect(block).toContain('401 Unauthorized');
-    expect(block).toContain('403 Forbidden');
-    expect(block).toContain('429 Too Many Requests');
+    expect(block).toContain('401');
+    expect(block).toContain('403');
+    expect(block).toContain('429');
   });
 });
