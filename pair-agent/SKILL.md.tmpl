@@ -93,9 +93,8 @@ Use AskUserQuestion:
 > **Same machine** skips the copy-paste ceremony. Credentials are written directly to
 > the agent's config directory. No tunnel needed.
 >
-> **Different machine** requires an ngrok tunnel so the remote agent can reach your
-> browser over the internet. A setup key and instruction block are generated for
-> copy-paste.
+> **Different machine** generates a setup key and instruction block. If ngrok is
+> installed, the tunnel starts automatically. If not, I'll walk you through setup.
 >
 > RECOMMENDATION: Choose A if the agent is local. It's instant, no copy-paste needed.
 
@@ -124,45 +123,63 @@ using the generic remote flow instead.
 
 ### If different machine (option B):
 
-Check if a tunnel is running:
+First, detect ngrok status:
 
 ```bash
-$B pair-agent
+which ngrok 2>/dev/null && echo "NGROK_INSTALLED" || echo "NGROK_NOT_INSTALLED"
+ngrok config check 2>/dev/null && echo "NGROK_AUTHED" || echo "NGROK_NOT_AUTHED"
 ```
 
-If the output shows "No tunnel active" and mentions ngrok:
+**If ngrok is installed and authed:** Just run the command. The CLI will auto-detect
+ngrok, start the tunnel, and print the instruction block with the tunnel URL:
 
-Tell the user:
-"Your browser server is localhost-only. For a remote agent to connect, you need
-an ngrok tunnel. Here's how to set one up:
+```bash
+$B pair-agent --client TARGET_HOST
+```
 
-1. Sign up at ngrok.com (free tier works)
-2. Copy your auth token
-3. Save it: `echo 'NGROK_AUTHTOKEN=your_token_here' > ~/.gstack/ngrok.env`
-4. Restart the server with tunnel: `BROWSE_TUNNEL=1 $B restart`
-5. Run `/pair-agent` again
+If the user also needs admin access (JS execution, cookies, storage):
 
-If you just want to test locally, choose 'Same machine' instead."
+```bash
+$B pair-agent --admin --client TARGET_HOST
+```
 
-STOP here. Wait for the user to set up ngrok and re-invoke.
-
-If the tunnel IS active (or if the user is OK with localhost-only for same-network use),
-the pair-agent command will print the instruction block. Show it to the user and tell them:
-
+Show the output to the user:
 "Copy everything between the ═══ lines and paste it into your other agent's chat.
 The agent will follow the instructions to connect. The setup key expires in 5 minutes."
 
-### Admin access
+**If ngrok is installed but NOT authed:** Walk the user through authentication:
 
-If the user mentions needing JavaScript execution, cookie access, or storage access:
+Tell the user:
+"ngrok is installed but not logged in. Let's fix that:
 
+1. Go to https://dashboard.ngrok.com/get-started/your-authtoken
+2. Copy your auth token
+3. Come back here and I'll run the auth command for you."
+
+STOP here and wait for the user to provide their auth token.
+
+When they provide it, run:
 ```bash
-$B pair-agent --admin
+ngrok config add-authtoken THEIR_TOKEN
 ```
 
-Tell the user: "This gives the remote agent full admin access including JS execution,
-cookie reading, and storage access. Only do this if you trust the agent and need
-these capabilities."
+Then retry `$B pair-agent --client TARGET_HOST`.
+
+**If ngrok is NOT installed:** Walk the user through installation:
+
+Tell the user:
+"To connect a remote agent, we need ngrok (a tunnel that exposes your local
+browser to the internet securely).
+
+1. Go to https://ngrok.com and sign up (free tier works)
+2. Install ngrok:
+   - macOS: `brew install ngrok`
+   - Linux: `snap install ngrok` or download from ngrok.com/download
+3. Auth it: `ngrok config add-authtoken YOUR_TOKEN`
+   (get your token from https://dashboard.ngrok.com/get-started/your-authtoken)
+4. Come back here and run `/pair-agent` again."
+
+STOP here. Wait for the user to install ngrok and re-invoke.
 
 ## Step 5: Verify connection
 

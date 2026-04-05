@@ -447,6 +447,33 @@ async function sendCommand(state: ServerState, command: string, args: string[], 
   }
 }
 
+// ─── Ngrok Detection ───────────────────────────────────────────
+
+/** Check if ngrok is installed and authenticated (native config or gstack env). */
+function isNgrokAvailable(): boolean {
+  // Check gstack's own ngrok env
+  const ngrokEnvPath = path.join(process.env.HOME || '/tmp', '.gstack', 'ngrok.env');
+  if (fs.existsSync(ngrokEnvPath)) return true;
+
+  // Check NGROK_AUTHTOKEN env var
+  if (process.env.NGROK_AUTHTOKEN) return true;
+
+  // Check ngrok's native config (macOS + Linux)
+  const ngrokConfigs = [
+    path.join(process.env.HOME || '/tmp', 'Library', 'Application Support', 'ngrok', 'ngrok.yml'),
+    path.join(process.env.HOME || '/tmp', '.config', 'ngrok', 'ngrok.yml'),
+    path.join(process.env.HOME || '/tmp', '.ngrok2', 'ngrok.yml'),
+  ];
+  for (const conf of ngrokConfigs) {
+    try {
+      const content = fs.readFileSync(conf, 'utf-8');
+      if (content.includes('authtoken:')) return true;
+    } catch {}
+  }
+
+  return false;
+}
+
 // ─── Pair-Agent DX ─────────────────────────────────────────────
 
 interface InstructionBlockOptions {
@@ -586,16 +613,85 @@ async function handlePairAgent(state: ServerState, args: string[]): Promise<void
   let serverUrl: string;
   if (pairData.tunnel_url) {
     serverUrl = pairData.tunnel_url;
-  } else {
-    // Check if ngrok is configured but tunnel isn't running
-    const ngrokEnvPath = path.join(process.env.HOME || '/tmp', '.gstack', 'ngrok.env');
-    if (fs.existsSync(ngrokEnvPath) && !localHost) {
-      console.warn('[browse] ngrok is configured but tunnel is not running.');
-      console.warn('[browse] Start the tunnel: BROWSE_TUNNEL=1 $B restart');
-      console.warn('[browse] Using localhost for now (same-machine only).\n');
-    } else if (!localHost) {
-      console.warn('[browse] No tunnel active. Instructions use localhost (same-machine only).\n');
+  } else if (!localHost) {
+    // No tunnel active. Check if ngrok is available and auto-start.
+    const ngrokAvailable = isNgrokAvailable();
+    if (ngrokAvailable) {
+      console.log('[browse] ngrok is available. Starting tunnel...');
+      // Restart server with tunnel enabled
+      try {
+        const restartResp = await fetch(`http://127.0.0.1:${state.port}/command`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${state.token}`,
+          },
+          body: JSON.stringify({ command: 'restart', args: [] }),
+          signal: AbortSignal.timeout(5000),
+        }).catch(() => null);
+        // Wait for server to come back, then restart with tunnel
+        await Bun.sleep(1000);
+      } catch {}
+      // Restart the server process with BROWSE_TUNNEL=1
+      console.log('[browse] Restarting server with tunnel...');
+      const serverScript = resolveServerScript();
+      const proc = Bun.spawn(['bun', 'run', serverScript], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, BROWSE_STATE_FILE: config.stateFile, BROWSE_TUNNEL: '1' },
+      });
+      proc.unref();
+      // Wait for server to come back with tunnel
+      const deadline = Date.now() + 15000;
+      let tunnelUrl: string | null = null;
+      while (Date.now() < deadline) {
+        await Bun.sleep(500);
+        const newState = readState();
+        if (newState && await isServerHealthy(newState.port)) {
+          try {
+            const healthResp = await fetch(`http://127.0.0.1:${newState.port}/health`, {
+              signal: AbortSignal.timeout(2000),
+            });
+            const health = await healthResp.json() as any;
+            if (health.tunnel?.url) {
+              tunnelUrl = health.tunnel.url;
+              // Update state for the rest of the function
+              state.port = newState.port;
+              state.token = newState.token;
+              break;
+            }
+          } catch {}
+        }
+      }
+      if (tunnelUrl) {
+        console.log(`[browse] Tunnel active: ${tunnelUrl}\n`);
+        serverUrl = tunnelUrl;
+        // Re-create setup key with the new server (old one used old root token)
+        const newPairResp = await fetch(`http://127.0.0.1:${state.port}/pair`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${state.token}`,
+          },
+          body: JSON.stringify({ clientId: clientName, admin }),
+          signal: AbortSignal.timeout(5000),
+        });
+        if (newPairResp.ok) {
+          const newData = await newPairResp.json() as typeof pairData;
+          pairData.setup_key = newData.setup_key;
+          pairData.expires_at = newData.expires_at;
+          pairData.scopes = newData.scopes;
+        }
+      } else {
+        console.warn('[browse] Failed to start tunnel. Using localhost (same-machine only).\n');
+        serverUrl = pairData.server_url;
+      }
+    } else {
+      console.warn('[browse] No tunnel active and ngrok is not installed/configured.');
+      console.warn('[browse] Instructions will use localhost (same-machine only).');
+      console.warn('[browse] For remote agents: install ngrok (https://ngrok.com) and run `ngrok config add-authtoken <TOKEN>`\n');
+      serverUrl = pairData.server_url;
     }
+  } else {
     serverUrl = pairData.server_url;
   }
 
