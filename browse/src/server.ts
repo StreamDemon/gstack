@@ -1290,7 +1290,13 @@ async function start() {
         };
         // Sensitive fields only served on localhost (not through tunnel).
         // currentUrl reveals internal URLs, currentMessage reveals user intent.
-        // token needed by extension to authenticate subsequent requests.
+        //
+        // SECURITY NOTE (accepted risk): token is served on localhost /health so the
+        // Chrome extension can authenticate. This is NOT an escalation over baseline:
+        // any local process can already read the same token from ~/.gstack/.auth.json
+        // and .gstack/browse.json. Browser CORS blocks cross-origin reads (no
+        // Access-Control-Allow-Origin header). When tunneled, token is stripped.
+        // Do not remove this without providing an alternative extension auth path.
         if (!tunnelActive) {
           healthResponse.token = AUTH_TOKEN;
           healthResponse.currentUrl = browserManager.getCurrentUrl();
