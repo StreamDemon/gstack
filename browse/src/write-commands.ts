@@ -5,6 +5,7 @@
  * press, scroll, wait, viewport, cookie, header, useragent
  */
 
+import type { TabSession } from './tab-session';
 import type { BrowserManager } from './browser-manager';
 import { findInstalledBrowsers, importCookies, listSupportedBrowserNames } from './cookie-import-browser';
 import { generatePickerCode } from './cookie-picker-routes';
@@ -169,12 +170,13 @@ const CLEANUP_SELECTORS = {
 export async function handleWriteCommand(
   command: string,
   args: string[],
+  session: TabSession,
   bm: BrowserManager
 ): Promise<string> {
-  const page = bm.getPage();
+  const page = session.getPage();
   // Frame-aware target for locator-based operations (click, fill, etc.)
-  const target = bm.getActiveFrameOrPage();
-  const inFrame = bm.getFrame() !== null;
+  const target = session.getActiveFrameOrPage();
+  const inFrame = session.getFrame() !== null;
 
   switch (command) {
     case 'goto': {
@@ -210,9 +212,9 @@ export async function handleWriteCommand(
       if (!selector) throw new Error('Usage: browse click <selector>');
 
       // Auto-route: if ref points to a real <option> inside a <select>, use selectOption
-      const role = bm.getRefRole(selector);
+      const role = session.getRefRole(selector);
       if (role === 'option') {
-        const resolved = await bm.resolveRef(selector);
+        const resolved = await session.resolveRef(selector);
         if ('locator' in resolved) {
           const optionInfo = await resolved.locator.evaluate(el => {
             if (el.tagName !== 'OPTION') return null; // custom [role=option], not real <option>
@@ -229,7 +231,7 @@ export async function handleWriteCommand(
         }
       }
 
-      const resolved = await bm.resolveRef(selector);
+      const resolved = await session.resolveRef(selector);
       try {
         if ('locator' in resolved) {
           await resolved.locator.click({ timeout: 5000 });
@@ -259,7 +261,7 @@ export async function handleWriteCommand(
       const [selector, ...valueParts] = args;
       const value = valueParts.join(' ');
       if (!selector || !value) throw new Error('Usage: browse fill <selector> <value>');
-      const resolved = await bm.resolveRef(selector);
+      const resolved = await session.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.fill(value, { timeout: 5000 });
       } else {
@@ -274,7 +276,7 @@ export async function handleWriteCommand(
       const [selector, ...valueParts] = args;
       const value = valueParts.join(' ');
       if (!selector || !value) throw new Error('Usage: browse select <selector> <value>');
-      const resolved = await bm.resolveRef(selector);
+      const resolved = await session.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.selectOption(value, { timeout: 5000 });
       } else {
@@ -288,7 +290,7 @@ export async function handleWriteCommand(
     case 'hover': {
       const selector = args[0];
       if (!selector) throw new Error('Usage: browse hover <selector>');
-      const resolved = await bm.resolveRef(selector);
+      const resolved = await session.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.hover({ timeout: 5000 });
       } else {
@@ -314,7 +316,7 @@ export async function handleWriteCommand(
     case 'scroll': {
       const selector = args[0];
       if (selector) {
-        const resolved = await bm.resolveRef(selector);
+        const resolved = await session.resolveRef(selector);
         if ('locator' in resolved) {
           await resolved.locator.scrollIntoViewIfNeeded({ timeout: 5000 });
         } else {
@@ -347,7 +349,7 @@ export async function handleWriteCommand(
       const MAX_WAIT_MS = 300_000;
       const MIN_WAIT_MS = 1_000;
       const timeout = Math.min(Math.max(args[1] ? parseInt(args[1], 10) || MIN_WAIT_MS : 15000, MIN_WAIT_MS), MAX_WAIT_MS);
-      const resolved = await bm.resolveRef(selector);
+      const resolved = await session.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.waitFor({ state: 'visible', timeout });
       } else {
@@ -424,7 +426,7 @@ export async function handleWriteCommand(
         }
       }
 
-      const resolved = await bm.resolveRef(selector);
+      const resolved = await session.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.setInputFiles(filePaths);
       } else {
