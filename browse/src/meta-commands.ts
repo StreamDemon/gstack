@@ -52,6 +52,9 @@ export async function handleMetaCommand(
   tokenInfo?: TokenInfo | null,
   opts?: MetaCommandOpts,
 ): Promise<string> {
+  // Per-tab operations use the active session; global operations use bm directly
+  const session = bm.getActiveSession();
+
   switch (command) {
     // ─── Tabs ──────────────────────────────────────────
     case 'tabs': {
@@ -306,11 +309,11 @@ export async function handleMetaCommand(
               if (bm.isWatching()) {
                 result = 'BLOCKED: write commands disabled in watch mode';
               } else {
-                result = await handleWriteCommand(name, cmdArgs, bm);
+                result = await handleWriteCommand(name, cmdArgs, session, bm);
               }
               lastWasWrite = true;
             } else if (READ_COMMANDS.has(name)) {
-              result = await handleReadCommand(name, cmdArgs, bm);
+              result = await handleReadCommand(name, cmdArgs, session);
               if (PAGE_CONTENT_COMMANDS.has(name)) {
                 result = wrapUntrustedContent(result, bm.getCurrentUrl());
               }
@@ -367,7 +370,7 @@ export async function handleMetaCommand(
     // ─── Snapshot ─────────────────────────────────────
     case 'snapshot': {
       const isScoped = tokenInfo && tokenInfo.clientId !== 'root';
-      const snapshotResult = await handleSnapshot(args, bm, {
+      const snapshotResult = await handleSnapshot(args, session, {
         splitForScoped: !!isScoped,
       });
       // Scoped tokens get split format (refs outside envelope); root gets basic wrapping
@@ -387,7 +390,7 @@ export async function handleMetaCommand(
       bm.resume();
       // Re-snapshot to capture current page state after human interaction
       const isScoped2 = tokenInfo && tokenInfo.clientId !== 'root';
-      const snapshot = await handleSnapshot(['-i'], bm, { splitForScoped: !!isScoped2 });
+      const snapshot = await handleSnapshot(['-i'], session, { splitForScoped: !!isScoped2 });
       if (isScoped2) {
         return `RESUMED\n${snapshot}`;
       }
