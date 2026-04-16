@@ -827,7 +827,21 @@ export async function importCookiesViaCdp(
   if (!dataDir) throw new CookieImportError(`No Windows data dir for ${browser.name}`, 'not_installed');
   const userDataDir = path.join(getBaseDir('win32'), dataDir);
 
-  // Launch Chrome headless with remote debugging on the real profile
+  // Launch Chrome headless with remote debugging on the real profile.
+  //
+  // Security posture of the debug port:
+  //   - Chrome binds --remote-debugging-port to 127.0.0.1 by default. We rely
+  //     on that — the port is NOT exposed to the network. Any local process
+  //     running as the same user could connect and read cookies, but if an
+  //     attacker already has local-user access they can read the cookie DB
+  //     directly. Threat model: no worse than baseline.
+  //   - Port is randomized in [9222, 9321] to avoid collisions with other
+  //     Chrome-based tools the user may have open. Not cryptographic.
+  //   - Chrome is always killed in the finally block below (even on crash).
+  //
+  // Debugging note: if this path starts failing after a Chrome update,
+  // check the Chrome version logged below — Chrome's ABE key format (v20)
+  // or /json/list shape can change between major versions.
   const debugPort = 9222 + Math.floor(Math.random() * 100);
   const chromeProc = Bun.spawn([
     exePath,
@@ -847,8 +861,20 @@ export async function importCookiesViaCdp(
   // Network.getAllCookies is only available on page targets, not browser.
   let wsUrl: string | null = null;
   const startTime = Date.now();
+  let loggedVersion = false;
   while (Date.now() - startTime < 15_000) {
     try {
+      // One-time version log for future diagnostics when Chrome changes v20 format.
+      if (!loggedVersion) {
+        try {
+          const versionResp = await fetch(`http://127.0.0.1:${debugPort}/json/version`);
+          if (versionResp.ok) {
+            const v = await versionResp.json() as { Browser?: string };
+            console.log(`[cookie-import] CDP fallback: ${browser.name} ${v.Browser || 'unknown version'}`);
+            loggedVersion = true;
+          }
+        } catch {}
+      }
       const resp = await fetch(`http://127.0.0.1:${debugPort}/json/list`);
       if (resp.ok) {
         const targets = await resp.json() as Array<{ type: string; webSocketDebuggerUrl?: string }>;
