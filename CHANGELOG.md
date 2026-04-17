@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.18.1.0] - 2026-04-16
+## [0.18.2.0] - 2026-04-16
 
 ### Added
 - **Windows cookie import.** `/setup-browser-cookies` now works on Windows. Point it at Chrome, Edge, Brave, or Chromium, pick a profile, and gstack will pull your real browser cookies into the headless session. Handles AES-256-GCM (Chrome 80+), DPAPI key unwrap via PowerShell, and falls back to a headless CDP session for v20 App-Bound Encryption on Chrome 127+. Windows users can now do authenticated QA testing with `/qa` and `/design-review` for the first time.
@@ -14,9 +14,23 @@
 
 ### For contributors
 - Community wave lands 6 PRs: #993 (byliu-labs), #994 (joelgreen), #996 (voidborne-d), #864 (cathrynlavery), #982 (breakneo), #892 (msr-hickory).
-- SIGTERM handling is now mode-aware. In normal mode the server ignores SIGTERM so Claude Code's sandbox doesn't tear it down mid-session. In headed mode (`/open-gstack-browser`) and tunnel mode (`/pair-agent`) SIGTERM still triggers a clean shutdown — those modes skip idle cleanup, so without the mode gate orphan daemons would accumulate forever. Same logic applies to the parent-PID watchdog. Inline comments document the resolution order.
+- SIGTERM handling is now mode-aware. In normal mode the server ignores SIGTERM so Claude Code's sandbox doesn't tear it down mid-session. In headed mode (`/open-gstack-browser`) and tunnel mode (`/pair-agent`) SIGTERM still triggers a clean shutdown — those modes skip idle cleanup, so without the mode gate orphan daemons would accumulate forever. Note that v0.18.1.0 also disables the parent-PID watchdog when `BROWSE_HEADED=1`, so headed mode is doubly protected. Inline comments document the resolution order.
 - Windows v20 App-Bound Encryption CDP fallback now logs the Chrome version on entry and has an inline comment documenting the debug-port security posture (127.0.0.1-only, random port in [9222, 9321] for collision avoidance, always killed in finally).
 - New regression test `test/openclaw-native-skills.test.ts` pins OpenClaw skill frontmatter to `name` + `description` only — catches version/metadata drift at PR time.
+
+## [0.18.1.0] - 2026-04-16
+
+### Fixed
+- **`/open-gstack-browser` actually stays open now.** If you ran `/open-gstack-browser` or `$B connect` and your browser vanished roughly 15 seconds later, this was why: a watchdog inside the browse server was polling the CLI process that spawned it, and when the CLI exited (which it does, immediately, right after launching the browser), the watchdog said "orphan!" and killed everything. The fix disables that watchdog for headed mode, both in the CLI (always set `BROWSE_PARENT_PID=0` for headed launches) and in the server (skip the watchdog entirely when `BROWSE_HEADED=1`). Two layers of defense in case a future launcher forgets to pass the env var. Thanks to @rocke2020 (#1020), @sanghyuk-seo-nexcube (#1018), @rodbland2021 (#1012), and @jbetala7 (#986) for independently diagnosing this and sending in clean, well-documented fixes.
+- **Closing the headed browser window now cleans up properly.** Before this release, clicking the X on the GStack Browser window skipped the server's cleanup routine and exited the process directly. That left behind stale sidebar-agent processes polling a dead server, unsaved chat session state, leftover Chromium profile locks (which cause "profile in use" errors on the next `$B connect`), and a stale `browse.json` state file. Now the disconnect handler routes through the full `shutdown()` path first, cleans everything, and then exits with code 2 (which still distinguishes user-close from crash).
+- **CI/Claude Code Bash calls can now share a persistent headless server.** The headless spawn path used to hardcode the CLI's own PID as the watchdog target, ignoring `BROWSE_PARENT_PID=0` even if you set it in your environment. Now `BROWSE_PARENT_PID=0 $B goto https://...` keeps the server alive across short-lived CLI invocations, which is what multi-step workflows (CI matrices, Claude Code's Bash tool, cookie picker flows) actually want.
+- **`SIGTERM` / `SIGINT` shutdown now exits with code 0 instead of 1.** Regression caught during /ship's adversarial review: when `shutdown()` started accepting an `exitCode` argument, Node's signal listeners silently passed the signal name (`'SIGTERM'`) as the exit code, which got coerced to `NaN` and used `1`. Wrapped the listeners so they call `shutdown()` with no args. Your `Ctrl+C` now exits clean again.
+
+### For contributors
+- `test/relink.test.ts` no longer flakes under parallel test load. The 23 tests in that file each shell out to `gstack-config` + `gstack-relink` (bash subprocess work), and under `bun test` with other suites running, each test drifted ~200ms past Bun's 5s default. Wrapped `test` to default the per-test timeout to 15s with `Object.assign` preserving `.only`/`.skip`/`.each` sub-APIs.
+- `BrowserManager` gained an `onDisconnect` callback (wired by `server.ts` to `shutdown(2)`), replacing the direct `process.exit(2)` in the disconnect handler. The callback is wrapped with try/catch + Promise rejection handling so a rejecting cleanup path still exits the process instead of leaving a live server attached to a dead browser.
+- `shutdown()` now accepts an optional `exitCode: number = 0` parameter, used by the disconnect path (exit 2) and the signal path (default 0). Same cleanup code, two call sites, distinct exit codes.
+- `BROWSE_PARENT_PID` parsing in `cli.ts` now matches `server.ts`: `parseInt` instead of strict string equality, so `BROWSE_PARENT_PID=0\n` (common from shell `export`) is honored.
 
 ## [0.18.0.1] - 2026-04-16
 

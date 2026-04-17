@@ -757,8 +757,20 @@ const idleCheckInterval = setInterval(() => {
 // server can become an orphan — keeping chrome-headless-shell alive and
 // causing console-window flicker on Windows. Poll the parent PID every 15s
 // and self-terminate if it is gone.
+//
+// Headed mode (BROWSE_HEADED=1 or BROWSE_PARENT_PID=0): The user controls
+// the browser window lifecycle. The CLI exits immediately after connect,
+// so the watchdog would kill the server prematurely. Disabled in both cases
+// as defense-in-depth — the CLI sets PID=0 for headed mode, and the server
+// also checks BROWSE_HEADED in case a future launcher forgets.
+// Cleanup happens via browser disconnect event or $B disconnect.
 const BROWSE_PARENT_PID = parseInt(process.env.BROWSE_PARENT_PID || '0', 10);
-if (BROWSE_PARENT_PID > 0) {
+// Outer gate: if the spawner explicitly marks this as headed (env var set at
+// launch time), skip registering the watchdog entirely. Cheaper than entering
+// the closure every 15s. The CLI's connect path sets BROWSE_HEADED=1 + PID=0,
+// so this branch is the normal path for /open-gstack-browser.
+const IS_HEADED_WATCHDOG = process.env.BROWSE_HEADED === '1';
+if (BROWSE_PARENT_PID > 0 && !IS_HEADED_WATCHDOG) {
   let parentGone = false;
   setInterval(() => {
     try {
@@ -786,6 +798,10 @@ if (BROWSE_PARENT_PID > 0) {
       }
     }
   }, 15_000);
+} else if (IS_HEADED_WATCHDOG) {
+  console.log('[browse] Parent-process watchdog disabled (headed mode)');
+} else if (BROWSE_PARENT_PID === 0) {
+  console.log('[browse] Parent-process watchdog disabled (BROWSE_PARENT_PID=0)');
 }
 
 // ─── Command Sets (from commands.ts — single source of truth) ───
@@ -812,6 +828,10 @@ function emitInspectorEvent(event: any): void {
 
 // ─── Server ────────────────────────────────────────────────────
 const browserManager = new BrowserManager();
+// When the user closes the headed browser window, run full cleanup
+// (kill sidebar-agent, save session, remove profile locks, delete state file)
+// before exiting with code 2. Exit code 2 distinguishes user-close from crashes (1).
+browserManager.onDisconnect = () => shutdown(2);
 let isShuttingDown = false;
 
 // Test if a port is available by binding and immediately releasing.
@@ -1199,7 +1219,7 @@ async function handleCommand(body: any, tokenInfo?: TokenInfo | null): Promise<R
   });
 }
 
-async function shutdown() {
+async function shutdown(exitCode: number = 0) {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
@@ -1240,12 +1260,18 @@ async function shutdown() {
   // Clean up state file
   safeUnlinkQuiet(config.stateFile);
 
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 // Handle signals
-// SIGINT (Ctrl+C): user intentionally stopping → shutdown
-process.on('SIGINT', shutdown);
+//
+// Node passes the signal name (e.g. 'SIGTERM') as the first arg to listeners.
+// Wrap calls to shutdown() so it receives no args — otherwise the string gets
+// passed as exitCode and process.exit() coerces it to NaN, exiting with code 1
+// instead of 0. (Caught in v0.18.1.0 #1025.)
+//
+// SIGINT (Ctrl+C): user intentionally stopping → shutdown.
+process.on('SIGINT', () => shutdown());
 // SIGTERM behavior depends on mode:
 // - Normal (headless) mode: Claude Code's Bash sandbox fires SIGTERM when the
 //   parent shell exits between tool invocations. Ignoring it keeps the server
@@ -1253,6 +1279,8 @@ process.on('SIGINT', shutdown);
 // - Headed / tunnel mode: idle timeout doesn't apply in these modes. Respect
 //   SIGTERM so external tooling (systemd, supervisord, CI) can shut cleanly
 //   without waiting forever. Ctrl+C and /stop still work either way.
+// - Active cookie picker: never tear down mid-import regardless of mode —
+//   would strand the picker UI with "Failed to fetch."
 process.on('SIGTERM', () => {
   if (hasActivePicker()) {
     console.log('[browse] Received SIGTERM but cookie picker is active, ignoring to avoid stranding the picker UI');
