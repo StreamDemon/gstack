@@ -9,6 +9,10 @@ description: |
   ~100ms per command. Use when you need to test a feature, verify a deployment, dogfood a
   user flow, or file a bug with evidence. Use when asked to "open in browser", "test the
   site", "take a screenshot", or "dogfood this". (gstack)
+triggers:
+  - browse a page
+  - headless browser
+  - take page screenshot
 allowed-tools:
   - Bash
   - Read

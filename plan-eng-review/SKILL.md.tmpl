@@ -22,9 +22,15 @@ allowed-tools:
   - AskUserQuestion
   - Bash
   - WebSearch
+triggers:
+  - review architecture
+  - eng plan review
+  - check the implementation plan
 ---
 
 {{PREAMBLE}}
+
+{{GBRAIN_CONTEXT_LOAD}}
 
 # Plan Review Mode
 
@@ -294,6 +300,8 @@ Substitute values from the Completion Summary:
 {{PLAN_FILE_REVIEW_REPORT}}
 
 {{LEARNINGS_LOG}}
+
+{{GBRAIN_SAVE_RESULTS}}
 
 ## Next Steps — Review Chaining
 

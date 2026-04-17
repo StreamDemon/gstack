@@ -1,5 +1,64 @@
 # Changelog
 
+## [0.18.1.0] - 2026-04-16
+
+### Fixed
+- **`/open-gstack-browser` actually stays open now.** If you ran `/open-gstack-browser` or `$B connect` and your browser vanished roughly 15 seconds later, this was why: a watchdog inside the browse server was polling the CLI process that spawned it, and when the CLI exited (which it does, immediately, right after launching the browser), the watchdog said "orphan!" and killed everything. The fix disables that watchdog for headed mode, both in the CLI (always set `BROWSE_PARENT_PID=0` for headed launches) and in the server (skip the watchdog entirely when `BROWSE_HEADED=1`). Two layers of defense in case a future launcher forgets to pass the env var. Thanks to @rocke2020 (#1020), @sanghyuk-seo-nexcube (#1018), @rodbland2021 (#1012), and @jbetala7 (#986) for independently diagnosing this and sending in clean, well-documented fixes.
+- **Closing the headed browser window now cleans up properly.** Before this release, clicking the X on the GStack Browser window skipped the server's cleanup routine and exited the process directly. That left behind stale sidebar-agent processes polling a dead server, unsaved chat session state, leftover Chromium profile locks (which cause "profile in use" errors on the next `$B connect`), and a stale `browse.json` state file. Now the disconnect handler routes through the full `shutdown()` path first, cleans everything, and then exits with code 2 (which still distinguishes user-close from crash).
+- **CI/Claude Code Bash calls can now share a persistent headless server.** The headless spawn path used to hardcode the CLI's own PID as the watchdog target, ignoring `BROWSE_PARENT_PID=0` even if you set it in your environment. Now `BROWSE_PARENT_PID=0 $B goto https://...` keeps the server alive across short-lived CLI invocations, which is what multi-step workflows (CI matrices, Claude Code's Bash tool, cookie picker flows) actually want.
+- **`SIGTERM` / `SIGINT` shutdown now exits with code 0 instead of 1.** Regression caught during /ship's adversarial review: when `shutdown()` started accepting an `exitCode` argument, Node's signal listeners silently passed the signal name (`'SIGTERM'`) as the exit code, which got coerced to `NaN` and used `1`. Wrapped the listeners so they call `shutdown()` with no args. Your `Ctrl+C` now exits clean again.
+
+### For contributors
+- `test/relink.test.ts` no longer flakes under parallel test load. The 23 tests in that file each shell out to `gstack-config` + `gstack-relink` (bash subprocess work), and under `bun test` with other suites running, each test drifted ~200ms past Bun's 5s default. Wrapped `test` to default the per-test timeout to 15s with `Object.assign` preserving `.only`/`.skip`/`.each` sub-APIs.
+- `BrowserManager` gained an `onDisconnect` callback (wired by `server.ts` to `shutdown(2)`), replacing the direct `process.exit(2)` in the disconnect handler. The callback is wrapped with try/catch + Promise rejection handling so a rejecting cleanup path still exits the process instead of leaving a live server attached to a dead browser.
+- `shutdown()` now accepts an optional `exitCode: number = 0` parameter, used by the disconnect path (exit 2) and the signal path (default 0). Same cleanup code, two call sites, distinct exit codes.
+- `BROWSE_PARENT_PID` parsing in `cli.ts` now matches `server.ts`: `parseInt` instead of strict string equality, so `BROWSE_PARENT_PID=0\n` (common from shell `export`) is honored.
+
+## [0.18.0.1] - 2026-04-16
+
+### Fixed
+- **Windows install no longer fails with a build error.** If you installed gstack on Windows (or a fresh Linux box), `./setup` was dying with `cannot write multiple output files without an output directory`. The Windows-compat Node server bundle now builds cleanly, so `/browse`, `/canary`, `/pair-agent`, `/open-gstack-browser`, `/setup-browser-cookies`, and `/design-review` all work on Windows again. If you were stuck on gstack v0.15.11-era features without knowing it, this is why. Thanks to @tomasmontbrun-hash (#1019) and @scarson (#1013) for independently tracking this down, and to the issue reporters on #1010 and #960.
+- **CI stops lying about green builds.** The `build` and `test` scripts in `package.json` had a shell precedence trap where a trailing `|| true` swallowed failures from the *entire* command chain, not just the cleanup step it was meant for. That's how the Windows build bug above shipped in the first place — CI ran the build, the build failed, and CI reported success anyway. Now build and test failures actually fail. Silent CI is the worst kind of CI.
+- **`/pair-agent` on Windows surfaces install problems at install time, not tunnel time.** `./setup` now verifies Node can load `@ngrok/ngrok` on Windows, just like it already did for Playwright. If the native binary didn't install, you find out now instead of the first time you try to pair an agent.
+
+### For contributors
+- New `browse/test/build.test.ts` validates `server-node.mjs` is well-formed ES module syntax and that `@ngrok/ngrok` was actually externalized (not inlined). Gracefully skips when no prior build has run.
+- Added a policy comment in `browse/scripts/build-node-server.sh` explaining when and why to externalize a dependency. If you add a dep with a native addon or a dynamic `await import()`, the comment tells you where to plug it in.
+
+## [0.18.0.0] - 2026-04-15
+
+### Added
+- **Confusion Protocol.** Every workflow skill now has an inline ambiguity gate. When Claude hits a decision that could go two ways (which architecture? which data model? destructive operation with unclear scope?), it stops and asks instead of guessing. Scoped to high-stakes decisions only, so it doesn't slow down routine coding. Addresses Karpathy's #1 AI coding failure mode.
+- **Hermes host support.** gstack now generates skill docs for [Hermes Agent](https://github.com/nousresearch/hermes-agent) with proper tool rewrites (`terminal`, `read_file`, `patch`, `delegate_task`). `./setup --host hermes` prints integration instructions.
+- **GBrain host + brain-first resolver.** GBrain is a "mod" for gstack. When installed, your coding skills become brain-aware: they search your brain for relevant context before starting and save results to your brain after finishing. 10 skills are now brain-aware: /office-hours, /investigate, /plan-ceo-review, /retro, /ship, /qa, /design-review, /plan-eng-review, /cso, and /design-consultation. Compatible with GBrain >= v0.10.0.
+- **GBrain v0.10.0 integration.** Agent instructions now use `gbrain search` (fast keyword lookup) instead of `gbrain query` (expensive hybrid). Every command shows full CLI syntax with `--title`, `--tags`, and heredoc examples. Keyword extraction guidance helps agents search effectively. Entity enrichment auto-creates stub pages for people and companies mentioned in skill output. Throttle errors are named so agents can detect and handle them. A preamble health check runs `gbrain doctor --fast --json` at session start and names failing checks when the brain is degraded.
+- **Skill triggers for GBrain router.** All 38 skill templates now include `triggers:` arrays in their frontmatter, multi-word keywords like "debug this", "ship it", "brainstorm this". These power GBrain's RESOLVER.md skill router and pass `checkResolvable()` validation. Distinct from `voice-triggers:` (speech-to-text aliases).
+- **Hermes brain support.** Hermes agents with GBrain installed as a mod now get brain features automatically. The resolver fallback logic ("if GBrain is not available, proceed without") handles non-GBrain Hermes installs gracefully.
+- **slop:diff in /review.** Every code review now runs `bun run slop:diff` as an advisory diagnostic, catching AI code quality issues (empty catches, redundant abstractions, overcomplicated patterns) before they land. Informational only, never blocking.
+- **Karpathy compatibility.** README now positions gstack as the workflow enforcement layer for [Karpathy-style CLAUDE.md rules](https://github.com/forrestchang/andrej-karpathy-skills) (17K stars). Maps each failure mode to the gstack skill that addresses it.
+
+### Changed
+- **CEO review HARD GATE reinforcement.** "Do NOT make any code changes. Review only." now repeats at every STOP point (12 locations), not just the top. Prompt repetition measurably reduces the "starts implementing" failure mode.
+- **Office-hours design doc visibility.** After writing the design doc, the skill now prints the full path so downstream skills (/plan-ceo-review, /plan-eng-review) can find it.
+- **Investigate investigation history.** Each investigation now logs to the learnings system with `type: "investigation"` and affected file paths. Future investigations on the same files surface prior root causes automatically. Recurring bugs in the same area = architectural smell.
+- **Retro non-git context.** If `~/.gstack/retro-context.md` exists, the retro now reads it for meeting notes, calendar events, and decisions that don't appear in git history.
+- **Native OpenClaw skills improved.** The 4 hand-crafted ClawHub skills (office-hours, ceo-review, investigate, retro) now mirror the template improvements above.
+- **Host count: 8 to 10.** Hermes and GBrain join Claude, Codex, Factory, Kiro, OpenCode, Slate, Cursor, and OpenClaw.
+
+## [0.17.0.0] - 2026-04-14
+
+### Added
+- **UX behavioral foundations.** Every design skill now thinks about how users actually behave, not just how the interface looks. A shared `{{UX_PRINCIPLES}}` resolver distills Steve Krug's "Don't Make Me Think" into actionable guidance: scanning behavior, satisficing, the goodwill reservoir, navigation wayfinding, and the trunk test. Injected into /design-html, /design-shotgun, /design-review, and /plan-design-review. Your design reviews now catch "this navigation is confusing" problems, not just "the contrast ratio is 4.3:1."
+- **6 usability tests woven into design-review.** The methodology now runs the Trunk Test (can you tell what site this is, what page you're on, and how to search?), 3-Second Scan (what do users see first?), Page Area Test (can you name each section's purpose?), Happy Talk Detection with word count (how much of this page is "blah blah blah"?), Mindless Choice Audit (does every click feel obvious?), and Goodwill Reservoir tracking with a visual dashboard (what depletes the user's patience at each step?).
+- **First-person narration mode.** Design review reports now read like a usability consultant watching someone use your site: "I'm looking at this page... my eye goes to the logo, then a wall of text I skip entirely. Wait, is that a button?" With anti-slop guardrail: if the agent can't name the specific element, it's generating platitudes.
+- **`$B ux-audit` command.** Standalone UX structural extraction. One command extracts site ID, navigation, headings, interactive elements, text blocks, and search presence as structured JSON. The agent applies the 6 usability tests to the data. Pure data extraction with element caps (50 headings, 100 links, 200 interactive, 50 text blocks).
+- **`snapshot -H` / `--heatmap` flag.** Color-coded overlay screenshots. Pass a JSON map of ref IDs to colors (`green`/`yellow`/`red`/`blue`/`orange`/`gray`) and get an annotated screenshot with per-element colored boxes. Color whitelist prevents CSS injection. Composable: any skill can use it.
+- **Token ceiling enforcement.** `gen-skill-docs` now warns if any generated SKILL.md exceeds 100KB (~25K tokens). Catches prompt bloat before it degrades agent performance.
+
+### Changed
+- **Krug's always/never rules** added to the design hard rules: never placeholder-as-label, never floating headings, always visited link distinction, never sub-16px body text. These join the existing AI slop blacklist as mechanical checks.
+- **Plan-design-review references** now include Steve Krug, Ginny Redish (Letting Go of the Words), and Caroline Jarrett (Forms that Work) alongside Rams, Norman, and Nielsen.
+
 ## [0.16.4.0] - 2026-04-13
 
 ### Added

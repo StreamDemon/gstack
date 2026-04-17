@@ -19,11 +19,18 @@ allowed-tools:
   - AskUserQuestion
   - WebSearch
 sensitive: true
+triggers:
+  - ship it
+  - create a pr
+  - push to main
+  - deploy this
 ---
 
 {{PREAMBLE}}
 
 {{BASE_BRANCH_DETECT}}
+
+{{GBRAIN_CONTEXT_LOAD}}
 
 # Ship: Fully Automated Ship Workflow
 
@@ -344,6 +351,8 @@ For each classified comment:
 {{ADVERSARIAL_STEP}}
 
 {{LEARNINGS_LOG}}
+
+{{GBRAIN_SAVE_RESULTS}}
 
 ## Step 4: Version bump (auto-decide)
 

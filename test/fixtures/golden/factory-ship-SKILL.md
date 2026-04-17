@@ -430,6 +430,19 @@ AI makes completeness near-free. Always recommend the complete option over short
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
 
+## Confusion Protocol
+
+When you encounter high-stakes ambiguity during coding:
+- Two plausible architectures or data models for the same requirement
+- A request that contradicts existing patterns and you're unsure which to follow
+- A destructive operation where the scope is unclear
+- Missing context that would change your approach significantly
+
+STOP. Name the ambiguity in one sentence. Present 2-3 options with tradeoffs.
+Ask the user. Do not guess on architectural or data model decisions.
+
+This does NOT apply to routine coding, small features, or obvious changes.
+
 ## Continuous Checkpoint Mode
 
 If `CHECKPOINT_MODE` is `"continuous"` (from preamble output): auto-commit work as
@@ -702,6 +715,8 @@ Print the detected base branch name. In every subsequent `git diff`, `git log`,
 branch name wherever the instructions say "the base branch" or `<default>`.
 
 ---
+
+
 
 # Ship: Fully Automated Ship Workflow
 
@@ -2277,6 +2292,8 @@ staleness detection: if those files are later deleted, the learning can be flagg
 
 **Only log genuine discoveries.** Don't log obvious things. Don't log things the user
 already knows. A good test: would this insight save time in a future session? If yes, log it.
+
+
 
 ## Step 4: Version bump (auto-decide)
 

@@ -92,7 +92,18 @@ _CHECKPOINT_PUSH=$(${ctx.paths.binDir}/gstack-config get checkpoint_push 2>/dev/
 echo "CHECKPOINT_MODE: $_CHECKPOINT_MODE"
 echo "CHECKPOINT_PUSH: $_CHECKPOINT_PUSH"
 # Detect spawned session (OpenClaw or other orchestrator)
-[ -n "$OPENCLAW_SESSION" ] && echo "SPAWNED_SESSION: true" || true
+[ -n "$OPENCLAW_SESSION" ] && echo "SPAWNED_SESSION: true" || true${ctx.host === 'gbrain' || ctx.host === 'hermes' ? `
+# GBrain health check (gbrain/hermes host only)
+if command -v gbrain &>/dev/null; then
+  _BRAIN_JSON=$(gbrain doctor --fast --json 2>/dev/null || echo '{}')
+  _BRAIN_SCORE=$(echo "$_BRAIN_JSON" | grep -o '"health_score":[0-9]*' | cut -d: -f2)
+  _BRAIN_FAILS=$(echo "$_BRAIN_JSON" | grep -o '"status":"fail"' | wc -l | tr -d ' ')
+  _BRAIN_WARNS=$(echo "$_BRAIN_JSON" | grep -o '"status":"warn"' | wc -l | tr -d ' ')
+  echo "BRAIN_HEALTH: \${_BRAIN_SCORE:-unknown} (\${_BRAIN_FAILS:-0} failures, \${_BRAIN_WARNS:-0} warnings)"
+  if [ "\${_BRAIN_SCORE:-100}" -lt 50 ] 2>/dev/null; then
+    echo "$_BRAIN_JSON" | grep -o '"name":"[^"]*","status":"[^"]*","message":"[^"]*"' || true
+  fi
+fi` : ''}
 \`\`\``;
 }
 

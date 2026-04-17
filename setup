@@ -67,7 +67,29 @@ case "$HOST" in
     echo "  3. See docs/OPENCLAW.md for the full architecture"
     echo ""
     exit 0 ;;
-  *) echo "Unknown --host value: $HOST (expected claude, codex, kiro, factory, openclaw, or auto)" >&2; exit 1 ;;
+  hermes)
+    echo ""
+    echo "Hermes integration uses the same model as OpenClaw — Hermes spawns"
+    echo "Claude Code sessions, and gstack provides methodology artifacts."
+    echo ""
+    echo "To integrate gstack with Hermes:"
+    echo "  1. Tell your Hermes agent: 'install gstack for hermes'"
+    echo "  2. Or generate artifacts: bun run gen:skill-docs --host hermes"
+    echo ""
+    exit 0 ;;
+  gbrain)
+    echo ""
+    echo "GBrain is a mod for gstack — it makes coding skills brain-aware."
+    echo "GBrain generates brain-enhanced skill variants that search your brain"
+    echo "for context before starting and save results after finishing."
+    echo ""
+    echo "To generate brain-aware skills:"
+    echo "  bun run gen:skill-docs --host gbrain"
+    echo ""
+    echo "GBrain setup and brain skills ship from the GBrain repo."
+    echo ""
+    exit 0 ;;
+  *) echo "Unknown --host value: $HOST (expected claude, codex, kiro, factory, openclaw, hermes, gbrain, or auto)" >&2; exit 1 ;;
 esac
 
 # ─── Resolve skill prefix preference ─────────────────────────
@@ -270,6 +292,10 @@ if ! ensure_playwright_browser; then
       cd "$SOURCE_GSTACK_DIR"
       # Bun's node_modules already has playwright; verify Node can require it
       node -e "require('playwright')" 2>/dev/null || npm install --no-save playwright
+      # @ngrok/ngrok is externalized in server-node.mjs and resolved at runtime.
+      # Verify the platform-specific native binary is installed so /pair-agent
+      # tunnels don't fail later with a cryptic module-not-found error.
+      node -e "require('@ngrok/ngrok')" 2>/dev/null || npm install --no-save @ngrok/ngrok
     )
   fi
 fi

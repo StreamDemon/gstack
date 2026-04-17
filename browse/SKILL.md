@@ -9,6 +9,10 @@ description: |
   ~100ms per command. Use when you need to test a feature, verify a deployment, dogfood a
   user flow, or file a bug with evidence. Use when asked to "open in browser", "test the
   site", "take a screenshot", or "dogfood this". (gstack)
+triggers:
+  - browse a page
+  - headless browser
+  - take page screenshot
 allowed-tools:
   - Bash
   - Read
@@ -488,7 +492,7 @@ State persists between calls (cookies, tabs, login sessions).
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.claude/skills/gstack/browse/dist/browse"
-[ -z "$B" ] && B=~/.claude/skills/gstack/browse/dist/browse
+[ -z "$B" ] && B="$HOME/.claude/skills/gstack/browse/dist/browse"
 if [ -x "$B" ]; then
   echo "READY: $B"
 else
@@ -642,6 +646,7 @@ The snapshot is your primary tool for understanding and interacting with pages.
 -a        --annotate              Annotated screenshot with red overlay boxes and ref labels
 -o <path> --output                Output path for annotated screenshot (default: <temp>/browse-annotated.png)
 -C        --cursor-interactive    Cursor-interactive elements (@c refs — divs with pointer, onclick). Auto-enabled when -i is used.
+-H <json> --heatmap               Color-coded overlay screenshot from JSON map: '{"@e1":"green","@e3":"red"}'. Valid colors: green, yellow, red, blue, orange, gray.
 ```
 
 All flags can be combined freely. `-o` only applies when `-a` is also used.
@@ -772,6 +777,7 @@ $B prettyscreenshot --cleanup --scroll-to ".pricing" --width 1440 ~/Desktop/hero
 | `network [--clear]` | Network requests |
 | `perf` | Page load timings |
 | `storage [set k v]` | Read all localStorage + sessionStorage as JSON, or set <key> <value> to write localStorage |
+| `ux-audit` | Extract page structure for UX behavioral analysis — site ID, nav, headings, text blocks, interactive elements. Returns JSON for agent interpretation. |
 
 ### Visual
 | Command | Description |

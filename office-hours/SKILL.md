@@ -23,6 +23,11 @@ allowed-tools:
   - Edit
   - AskUserQuestion
   - WebSearch
+triggers:
+  - brainstorm this
+  - is this worth building
+  - help me think through
+  - office hours
 ---
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->
@@ -439,6 +444,19 @@ AI makes completeness near-free. Always recommend the complete option over short
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
 
+## Confusion Protocol
+
+When you encounter high-stakes ambiguity during coding:
+- Two plausible architectures or data models for the same requirement
+- A request that contradicts existing patterns and you're unsure which to follow
+- A destructive operation where the scope is unclear
+- Missing context that would change your approach significantly
+
+STOP. Name the ambiguity in one sentence. Present 2-3 options with tradeoffs.
+Ask the user. Do not guess on architectural or data model decisions.
+
+This does NOT apply to routine coding, small features, or obvious changes.
+
 ## Continuous Checkpoint Mode
 
 If `CHECKPOINT_MODE` is `"continuous"` (from preamble output): auto-commit work as
@@ -679,7 +697,7 @@ plan's living status.
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.claude/skills/gstack/browse/dist/browse"
-[ -z "$B" ] && B=~/.claude/skills/gstack/browse/dist/browse
+[ -z "$B" ] && B="$HOME/.claude/skills/gstack/browse/dist/browse"
 if [ -x "$B" ]; then
   echo "READY: $B"
 else
@@ -716,6 +734,8 @@ You are a **YC office hours partner**. Your job is to ensure the problem is unde
 **HARD GATE:** Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action. Your only output is a design document.
 
 ---
+
+
 
 ## Phase 1: Context Gathering
 
@@ -1436,7 +1456,10 @@ PRIOR=$(ls -t ~/.gstack/projects/$SLUG/*-$BRANCH-design-*.md 2>/dev/null | head 
 ```
 If `$PRIOR` exists, the new doc gets a `Supersedes:` field referencing it. This creates a revision chain — you can trace how a design evolved across office hours sessions.
 
-Write to `~/.gstack/projects/{slug}/{user}-{branch}-design-{datetime}.md`:
+Write to `~/.gstack/projects/{slug}/{user}-{branch}-design-{datetime}.md`.
+
+After writing the design doc, tell the user:
+**"Design doc saved to: {full path}. Other skills (/plan-ceo-review, /plan-eng-review) will find it automatically."**
 
 ### Startup mode design doc template:
 
@@ -1624,6 +1647,8 @@ Present the reviewed design doc to the user via AskUserQuestion:
 - A) Approve — mark Status: APPROVED and proceed to handoff
 - B) Revise — specify which sections need changes (loop back to revise those sections)
 - C) Start over — return to Phase 2
+
+
 
 ---
 

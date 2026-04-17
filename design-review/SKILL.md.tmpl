@@ -19,9 +19,15 @@ allowed-tools:
   - Grep
   - AskUserQuestion
   - WebSearch
+triggers:
+  - visual design audit
+  - design qa
+  - fix design issues
 ---
 
 {{PREAMBLE}}
+
+{{GBRAIN_CONTEXT_LOAD}}
 
 # /design-review: Design Audit → Fix → Verify
 
@@ -98,6 +104,8 @@ echo "REPORT_DIR: $REPORT_DIR"
 ---
 
 {{LEARNINGS_SEARCH}}
+
+{{UX_PRINCIPLES}}
 
 ## Phases 1-6: Design Audit Baseline
 
@@ -290,6 +298,8 @@ If the repo has a `TODOS.md`:
 ---
 
 {{LEARNINGS_LOG}}
+
+{{GBRAIN_SAVE_RESULTS}}
 
 ## Additional Rules (design-review specific)
 

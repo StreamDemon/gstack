@@ -110,7 +110,7 @@ These are conversational skills. Your OpenClaw agent runs them directly via chat
 
 ### Other AI Agents
 
-gstack works on 8 AI coding agents, not just Claude. Setup auto-detects which
+gstack works on 10 AI coding agents, not just Claude. Setup auto-detects which
 agents you have installed:
 
 ```bash
@@ -128,6 +128,8 @@ Or target a specific agent with `./setup --host <name>`:
 | Factory Droid | `--host factory` | `~/.factory/skills/gstack-*/` |
 | Slate | `--host slate` | `~/.slate/skills/gstack-*/` |
 | Kiro | `--host kiro` | `~/.kiro/skills/gstack-*/` |
+| Hermes | `--host hermes` | `~/.hermes/skills/gstack-*/` |
+| GBrain (mod) | `--host gbrain` | `~/.gbrain/skills/gstack-*/` |
 
 **Want to add support for another agent?** See [docs/ADDING_A_HOST.md](docs/ADDING_A_HOST.md).
 It's one TypeScript config file, zero code changes.
@@ -235,6 +237,10 @@ Each skill feeds into the next. `/office-hours` writes a design doc that `/plan-
 | `/gstack-upgrade` | **Self-Updater** — upgrade gstack to latest. Detects global vs vendored install, syncs both, shows what changed. |
 
 **[Deep dives with examples and philosophy for every skill →](docs/skills.md)**
+
+### Karpathy's four failure modes? Already covered.
+
+Andrej Karpathy's [AI coding rules](https://github.com/forrestchang/andrej-karpathy-skills) (17K stars) nail four failure modes: wrong assumptions, overcomplexity, orthogonal edits, imperative over declarative. gstack's workflow skills enforce all four. `/office-hours` forces assumptions into the open before code is written. The Confusion Protocol stops Claude from guessing on architectural decisions. `/review` catches unnecessary complexity and drive-by edits. `/ship` transforms tasks into verifiable goals with test-first execution. If you already use Karpathy-style CLAUDE.md rules, gstack is the workflow enforcement layer that makes them stick across entire sprints, not just single prompts.
 
 ## Parallel sprints
 

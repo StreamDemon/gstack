@@ -8,6 +8,10 @@ description: |
   0-10 score, and tracks trends over time. Use when: "health check",
   "code quality", "how healthy is the codebase", "run all checks",
   "quality score". (gstack)
+triggers:
+  - code health check
+  - quality dashboard
+  - how healthy is codebase
 allowed-tools:
   - Bash
   - Read
@@ -431,6 +435,19 @@ AI makes completeness near-free. Always recommend the complete option over short
 | Bug fix | 4 hours | 15 min | ~20x |
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
+
+## Confusion Protocol
+
+When you encounter high-stakes ambiguity during coding:
+- Two plausible architectures or data models for the same requirement
+- A request that contradicts existing patterns and you're unsure which to follow
+- A destructive operation where the scope is unclear
+- Missing context that would change your approach significantly
+
+STOP. Name the ambiguity in one sentence. Present 2-3 options with tradeoffs.
+Ask the user. Do not guess on architectural or data model decisions.
+
+This does NOT apply to routine coding, small features, or obvious changes.
 
 ## Continuous Checkpoint Mode
 

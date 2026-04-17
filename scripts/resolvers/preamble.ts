@@ -31,6 +31,9 @@ import { generateRoutingInjection } from './preamble/generate-routing-injection'
 import { generateVendoringDeprecation } from './preamble/generate-vendoring-deprecation';
 import { generateSpawnedSessionCheck } from './preamble/generate-spawned-session-check';
 
+// Host-specific instructions
+import { generateBrainHealthInstruction } from './preamble/generate-brain-health-instruction';
+
 // Behavioral / voice
 import { generateVoiceDirective } from './preamble/generate-voice-directive';
 
@@ -38,6 +41,7 @@ import { generateVoiceDirective } from './preamble/generate-voice-directive';
 import { generateContextRecovery } from './preamble/generate-context-recovery';
 import { generateAskUserFormat } from './preamble/generate-ask-user-format';
 import { generateCompletenessSection } from './preamble/generate-completeness-section';
+import { generateConfusionProtocol } from './preamble/generate-confusion-protocol';
 import { generateContinuousCheckpoint } from './preamble/generate-continuous-checkpoint';
 import { generateContextHealth } from './preamble/generate-context-health';
 
@@ -51,7 +55,7 @@ export { generateTestFailureTriage } from './preamble/generate-test-failure-tria
 // Preamble Composition (tier → sections)
 // ─────────────────────────────────────────────
 // T1: core + upgrade + lake + telemetry + voice(trimmed) + completion
-// T2: T1 + voice(full) + ask + completeness + context-recovery
+// T2: T1 + voice(full) + ask + completeness + context-recovery + confusion + checkpoint + context-health
 // T3: T2 + repo-mode + search
 // T4: (same as T3 — TEST_FAILURE_TRIAGE is a separate {{}} placeholder, not preamble)
 //
@@ -74,9 +78,17 @@ export function generatePreamble(ctx: TemplateContext): string {
     generateRoutingInjection(ctx),
     generateVendoringDeprecation(ctx),
     generateSpawnedSessionCheck(),
+    generateBrainHealthInstruction(ctx),
     generateModelOverlay(ctx),
     generateVoiceDirective(tier),
-    ...(tier >= 2 ? [generateContextRecovery(ctx), generateAskUserFormat(ctx), generateCompletenessSection(), generateContinuousCheckpoint(), generateContextHealth()] : []),
+    ...(tier >= 2 ? [
+      generateContextRecovery(ctx),
+      generateAskUserFormat(ctx),
+      generateCompletenessSection(),
+      generateConfusionProtocol(),
+      generateContinuousCheckpoint(),
+      generateContextHealth(),
+    ] : []),
     ...(tier >= 3 ? [generateRepoModeSection(), generateSearchBeforeBuildingSection(ctx)] : []),
     generateCompletionStatus(ctx),
   ];

@@ -11,6 +11,10 @@ description: |
   "test the DX", "DX audit", "developer experience test", or "try the
   onboarding". Proactively suggest after shipping a developer-facing feature. (gstack)
   Voice triggers (speech-to-text aliases): "dx audit", "test the developer experience", "try the onboarding", "developer experience test".
+triggers:
+  - live dx audit
+  - test developer experience
+  - measure onboarding time
 allowed-tools:
   - Read
   - Edit
@@ -435,6 +439,19 @@ AI makes completeness near-free. Always recommend the complete option over short
 
 Include `Completeness: X/10` for each option (10=all edge cases, 7=happy path, 3=shortcut).
 
+## Confusion Protocol
+
+When you encounter high-stakes ambiguity during coding:
+- Two plausible architectures or data models for the same requirement
+- A request that contradicts existing patterns and you're unsure which to follow
+- A destructive operation where the scope is unclear
+- Missing context that would change your approach significantly
+
+STOP. Name the ambiguity in one sentence. Present 2-3 options with tradeoffs.
+Ask the user. Do not guess on architectural or data model decisions.
+
+This does NOT apply to routine coding, small features, or obvious changes.
+
 ## Continuous Checkpoint Mode
 
 If `CHECKPOINT_MODE` is `"continuous"` (from preamble output): auto-commit work as
@@ -714,7 +731,7 @@ branch name wherever the instructions say "the base branch" or `<default>`.
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.claude/skills/gstack/browse/dist/browse"
-[ -z "$B" ] && B=~/.claude/skills/gstack/browse/dist/browse
+[ -z "$B" ] && B="$HOME/.claude/skills/gstack/browse/dist/browse"
 if [ -x "$B" ]; then
   echo "READY: $B"
 else
