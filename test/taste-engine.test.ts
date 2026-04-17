@@ -208,13 +208,16 @@ describe('taste-engine: dimension extraction', () => {
     expect(p.dimensions.aesthetics.approved[0].value).toBe('brutalist');
   });
 
-  test('value matching is case-insensitive', () => {
+  test('value matching is case-insensitive (first casing wins)', () => {
     run(['approved', 'v1', '--reason', 'fonts: Geist']);
     run(['approved', 'v2', '--reason', 'fonts: GEIST']);
     const p = readProfile();
     // Should merge into a single entry
     expect(p.dimensions.fonts.approved).toHaveLength(1);
     expect(p.dimensions.fonts.approved[0].approved_count).toBe(2);
+    // Canonical value is the first-arrival casing. bumpPref() stores value on
+    // insert and never overwrites on subsequent bumps.
+    expect(p.dimensions.fonts.approved[0].value).toBe('Geist');
   });
 
   test('unknown dimension labels are silently ignored', () => {
@@ -231,14 +234,33 @@ describe('taste-engine: dimension extraction', () => {
 
 describe('taste-engine: session cap', () => {
   test('sessions truncate to last 50 entries (FIFO)', () => {
-    for (let i = 0; i < 55; i++) {
-      run(['approved', `v${i}`, '--reason', 'fonts: Geist']);
-    }
+    // Seed the profile with 50 existing sessions, then one real CLI call writes
+    // the 51st → the oldest must drop. Avoids 55 sequential subprocess spawns.
+    const seededSessions = Array.from({ length: 50 }, (_, i) => ({
+      ts: new Date(Date.now() - (50 - i) * 1000).toISOString(),
+      action: 'approved' as const,
+      variant: `seed-${i}`,
+    }));
+    writeProfile({
+      version: 1,
+      updated_at: new Date().toISOString(),
+      dimensions: {
+        fonts: { approved: [], rejected: [] },
+        colors: { approved: [], rejected: [] },
+        layouts: { approved: [], rejected: [] },
+        aesthetics: { approved: [], rejected: [] },
+      },
+      sessions: seededSessions,
+    });
+    const r = run(['approved', 'new-one', '--reason', 'fonts: Geist']);
+    expect(r.status).toBe(0);
     const p = readProfile();
     expect(p.sessions).toHaveLength(50);
-    // Last 5 should be preserved, first 5 dropped
-    expect(p.sessions[0].variant).toBe('v5');
-    expect(p.sessions[49].variant).toBe('v54');
+    // The oldest seed (seed-0) must have been evicted FIFO; seed-1 is now first;
+    // the new entry is last.
+    expect(p.sessions[0].variant).toBe('seed-1');
+    expect(p.sessions[48].variant).toBe('seed-49');
+    expect(p.sessions[49].variant).toBe('new-one');
   });
 });
 

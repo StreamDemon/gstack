@@ -97,6 +97,49 @@ describe('gstack-model-benchmark --dry-run', () => {
     }
   });
 
+  test('NOT READY path fires when auth env vars are stripped', () => {
+    // On a dev machine with full auth configured, the default --dry-run output
+    // shows OK for every provider with credentials. Strip auth env vars AND
+    // point HOME at an empty temp dir so adapters can't find file-based creds.
+    // This test exists to catch regressions where the NOT READY branch itself
+    // breaks (crash, missing remediation hint, wrong message format).
+    //
+    // Note: claude adapter's `os.homedir()` call is sometimes cached by Bun and
+    // doesn't always pick up the HOME override, so this test asserts only on
+    // gpt + gemini adapters where HOME redirection reliably makes the adapter's
+    // credentials-path check fail. Two adapters hitting NOT READY with full
+    // remediation messages is sufficient coverage for the branch.
+    const emptyHome = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-noauth-home-'));
+    try {
+      const minimalEnv: Record<string, string> = {
+        PATH: process.env.PATH ?? '',
+        TERM: process.env.TERM ?? 'xterm',
+        HOME: emptyHome,
+      };
+      const result = spawnSync('bun', ['run', BIN, '--prompt', 'hi', '--models', 'claude,gpt,gemini', '--dry-run'], {
+        cwd: ROOT,
+        env: minimalEnv,
+        encoding: 'utf-8',
+        timeout: 15000,
+      });
+      expect(result.status).toBe(0);
+      const out = result.stdout?.toString() ?? '';
+      // gpt + gemini must report NOT READY in this clean env (their auth check
+      // reads paths under the overridden HOME).
+      expect(out).toMatch(/gpt:\s+NOT READY/);
+      expect(out).toMatch(/gemini:\s+NOT READY/);
+      // Every NOT READY line must include a concrete remediation hint so users
+      // can resolve the missing auth. This is the regression we care about.
+      const notReadyLines = out.split('\n').filter(l => l.includes('NOT READY'));
+      expect(notReadyLines.length).toBeGreaterThanOrEqual(2);
+      for (const line of notReadyLines) {
+        expect(line).toMatch(/(install|Install|login|export|Run|Log in)/);
+      }
+    } finally {
+      fs.rmSync(emptyHome, { recursive: true, force: true });
+    }
+  });
+
   test('long prompt is truncated in dry-run display', () => {
     const longPrompt = 'x'.repeat(200);
     const r = run(['--prompt', longPrompt, '--dry-run']);

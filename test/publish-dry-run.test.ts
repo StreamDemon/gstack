@@ -27,7 +27,6 @@ beforeEach(() => {
   // structure: copy the bin into sandbox/bin/, write a controlled skills.json at the root.
   sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-sandbox-'));
   fs.mkdirSync(path.join(sandbox, 'bin'));
-  fs.mkdirSync(path.join(sandbox, 'test', 'helpers'), { recursive: true });
   binCopy = path.join(sandbox, 'bin', 'gstack-publish');
   fs.copyFileSync(BIN, binCopy);
   fs.chmodSync(binCopy, 0o755);

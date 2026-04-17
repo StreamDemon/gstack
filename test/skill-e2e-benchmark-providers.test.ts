@@ -18,7 +18,7 @@
  *   - Multi-turn tool-using prompts — our single-turn smoke skips `toolCalls > 0`
  */
 
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { ClaudeAdapter } from './helpers/providers/claude';
 import { GptAdapter } from './helpers/providers/gpt';
 import { GeminiAdapter } from './helpers/providers/gemini';
@@ -41,9 +41,20 @@ const gpt = new GptAdapter();
 const gemini = new GeminiAdapter();
 
 // Use a temp working directory so provider CLIs can't accidentally touch the repo.
-const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-e2e-'));
+// Created in beforeAll / cleaned in afterAll so concurrent CI runs don't leak.
+let workdir: string;
 
 describeIfEvals('multi-provider benchmark adapters (live)', () => {
+  beforeAll(() => {
+    workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-e2e-'));
+  });
+
+  afterAll(() => {
+    if (workdir && fs.existsSync(workdir)) {
+      fs.rmSync(workdir, { recursive: true, force: true });
+    }
+  });
+
   test('claude: available() returns structured ok/reason', async () => {
     const check = await claude.available();
     expect(check).toHaveProperty('ok');

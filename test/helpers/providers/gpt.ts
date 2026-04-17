@@ -31,9 +31,11 @@ export class GptAdapter implements ProviderAdapter {
 
   async run(opts: RunOpts): Promise<RunResult> {
     const start = Date.now();
-    // `--skip-git-repo-check` lets codex run in arbitrary working directories
-    // (temp dirs, non-git paths) without the interactive trust prompt. Benchmarks
-    // often don't care about the workdir — they're just running a prompt.
+    // `-s read-only` is load-bearing safety. With `--skip-git-repo-check` we
+    // bypass codex's interactive trust prompt for unknown directories (benchmarks
+    // often run in temp dirs / non-git paths), so the read-only sandbox is now
+    // the only boundary preventing codex from mutating the workdir. If you ever
+    // remove `-s read-only`, drop `--skip-git-repo-check` too.
     const args = ['exec', opts.prompt, '-C', opts.workdir, '-s', 'read-only', '--skip-git-repo-check', '--json'];
     if (opts.model) args.push('-m', opts.model);
     if (opts.extraArgs) args.push(...opts.extraArgs);
