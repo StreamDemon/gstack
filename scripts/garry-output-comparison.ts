@@ -38,12 +38,12 @@ const GARRY_EMAILS = [
 
 const TARGET_YEARS = [2013, 2026];
 
-// Repos to skip entirely because their activity is dominated by imported code
-// (initial commit that vendors an upstream codebase) rather than authored work.
-// When the script is pointed at one of these, it emits a stderr note and exits
-// without writing a per-repo JSON. Add more via PR with a one-line rationale.
+// Repos to skip entirely because they're not real shipping work (demos, spikes,
+// vendored imports, throwaway experiments). When the script is pointed at one
+// of these, it emits a stderr note and exits without writing a per-repo JSON.
+// Add more via PR with a one-line rationale.
 const EXCLUDED_REPOS: Record<string, string> = {
-  'tax-app': 'single 104K-line initial import, not authored code',
+  'tax-app': 'demo app for an upcoming YC channel video, not production shipping work',
 };
 
 type PerYearResult = {

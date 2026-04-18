@@ -55,7 +55,7 @@ To compare 2013 me vs 2026 me honestly, I wrote a script: `scripts/garry-output-
 
 I cloned all 41 repos owned by `garrytan/*` on GitHub — 15 public, 26 private — and ran the script against each. Bookface, the YC-internal social network I built in 2013 and 2014, is in the corpus. So are the three 2013-era projects (delicounter, tandong) and the upstream OSS contribution that year (zurb-foundation-wysihtml5).
 
-One repo excluded from the 2026 numbers: **tax-app**. A single commit of 104K logical lines, which is an initial import of a codebase I didn't author, not work I shipped. Baked into the script's `EXCLUDED_REPOS` constant so future re-runs skip it automatically. If other repos turn out to have similar import-dominated histories, they go in the same list with a one-line rationale.
+One repo excluded from the 2026 numbers: **tax-app**. It's a demo app I built for an upcoming YC channel video, not production shipping work, so it shouldn't count toward the productivity comparison. Baked into the script's `EXCLUDED_REPOS` constant so future re-runs skip it automatically. If other demos or throwaway spikes show up in the corpus, they go in the same list with a one-line rationale.
 
 The corpus also doesn't include my Posterous-era code from 2012, sold to Twitter along with the company. That's Twitter's private repos now. Can't reach it. If anything, excluding Posterous biases the 2013 numbers UP, because it removes work that would otherwise lower the per-day rate.
 
@@ -147,7 +147,7 @@ Take those seriously. Some of the critique is right. The point isn't that the cr
 
 ## So here's the corrected hero line
 
-My 2026 run rate on logical code change, not raw LOC which AI inflates, is about **810x my 2013 pace**. In less than a third of 2026, I've already produced **240x the entire 2013 year**. Measured across 40 of my public and private repos including Bookface, after excluding one repo (tax-app) whose history is dominated by a single import commit.
+My 2026 run rate on logical code change, not raw LOC which AI inflates, is about **810x my 2013 pace**. In less than a third of 2026, I've already produced **240x the entire 2013 year**. Measured across 40 of my public and private repos including Bookface, after excluding one repo (tax-app) that's a demo for an upcoming YC video, not shipping work.
 
 Adjusted for real code. Normalized by calendar day. Audited by a script anyone can re-run.
 
