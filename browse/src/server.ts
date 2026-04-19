@@ -526,6 +526,27 @@ function processAgentEvent(event: any): void {
     return;
   }
 
+  if (event.type === 'security_event') {
+    // Relay the security event as a chat entry so sidepanel.js's addChatEntry
+    // router (showSecurityBanner) sees it on the next /sidebar-chat poll.
+    // Preserve all the diagnostic fields the banner renders (verdict, reason,
+    // layer, confidence, domain, channel, tool).
+    addChatEntry({
+      ts,
+      role: 'agent',
+      type: 'security_event',
+      verdict: event.verdict,
+      reason: event.reason,
+      layer: event.layer,
+      confidence: event.confidence,
+      domain: event.domain,
+      channel: event.channel,
+      tool: event.tool,
+      signals: event.signals,
+    } as any);
+    return;
+  }
+
   // agent_start and agent_done are handled by the caller in the endpoint handler
 }
 
