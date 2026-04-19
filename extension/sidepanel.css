@@ -129,6 +129,11 @@
 
 .security-banner {
   position: relative;
+  /* Sit above the absolutely-positioned security-shield (z-index: 10) so
+     the banner's close button and controls receive clicks. Without this
+     the shield at top-right overlaps the banner's close X region and
+     intercepts pointer events. */
+  z-index: 20;
   padding: 20px 16px;
   text-align: center;
   background: rgba(20, 20, 20, 0.98);
