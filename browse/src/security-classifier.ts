@@ -174,6 +174,11 @@ async function ensureTestsavantStaged(onProgress?: (msg: string) => void): Promi
 let loadPromise: Promise<void> | null = null;
 
 export function loadTestsavant(onProgress?: (msg: string) => void): Promise<void> {
+  if (process.env.GSTACK_SECURITY_OFF === '1') {
+    testsavantState = 'failed';
+    testsavantLoadError = 'GSTACK_SECURITY_OFF=1 — ML classifier kill switch engaged';
+    return Promise.resolve();
+  }
   if (testsavantState === 'loaded') return Promise.resolve();
   if (loadPromise) return loadPromise;
   testsavantState = 'loading';
@@ -299,6 +304,7 @@ async function ensureDebertaStaged(onProgress?: (msg: string) => void): Promise<
 
 let debertaLoadPromise: Promise<void> | null = null;
 export function loadDeberta(onProgress?: (msg: string) => void): Promise<void> {
+  if (process.env.GSTACK_SECURITY_OFF === '1') return Promise.resolve();
   if (!isDebertaEnabled()) return Promise.resolve();
   if (debertaState === 'loaded') return Promise.resolve();
   if (debertaLoadPromise) return debertaLoadPromise;
