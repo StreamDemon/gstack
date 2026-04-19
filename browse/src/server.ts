@@ -25,7 +25,7 @@ import {
   runContentFilters, type ContentFilterResult,
   markHiddenElements, getCleanTextWithStripping, cleanupHiddenMarkers,
 } from './content-security';
-import { generateCanary, injectCanary } from './security';
+import { generateCanary, injectCanary, getStatus as getSecurityStatus } from './security';
 import { handleSnapshot, SNAPSHOT_FLAGS } from './snapshot';
 import {
   initRegistry, validateToken as validateScopedToken, checkScope, checkDomain,
@@ -1447,6 +1447,11 @@ async function start() {
             queueLength: messageQueue.length,
           },
           session: sidebarSession ? { id: sidebarSession.id, name: sidebarSession.name } : null,
+          // Security module status — drives the shield icon in the sidepanel.
+          // Returns {status: 'protected'|'degraded'|'inactive', layers: {...}}.
+          // Source of truth is ~/.gstack/security/session-state.json, written
+          // by sidebar-agent as the classifier warms up.
+          security: getSecurityStatus(),
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },

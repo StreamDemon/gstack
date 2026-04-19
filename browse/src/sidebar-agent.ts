@@ -15,7 +15,7 @@ import * as path from 'path';
 import { safeUnlink } from './error-handling';
 import {
   checkCanaryInStructure, logAttempt, hashPayload, extractDomain,
-  combineVerdict, type LayerSignal,
+  combineVerdict, writeSessionState, readSessionState, type LayerSignal,
 } from './security';
 import {
   loadTestsavant, scanPageContent, checkTranscript,
@@ -696,10 +696,22 @@ async function main() {
   // Warm up the ML classifier in the background. First call triggers a 112MB
   // download (~30s on average broadband). Non-blocking — the sidebar stays
   // functional on cold start; classifier just reports 'off' until warmed.
+  //
+  // On warmup completion (success or failure), write the classifier status to
+  // ~/.gstack/security/session-state.json so server.ts's /health endpoint can
+  // report it to the sidepanel for shield icon rendering.
   loadTestsavant((msg) => console.log(`[security-classifier] ${msg}`))
     .then(() => {
       const s = getClassifierStatus();
       console.log(`[sidebar-agent] Classifier warmup complete: ${JSON.stringify(s)}`);
+      const existing = readSessionState();
+      writeSessionState({
+        sessionId: existing?.sessionId ?? String(process.pid),
+        canary: existing?.canary ?? '',
+        warnedDomains: existing?.warnedDomains ?? [],
+        classifierStatus: s,
+        lastUpdated: new Date().toISOString(),
+      });
     })
     .catch((err) => console.warn('[sidebar-agent] Classifier warmup failed (degraded mode):', err?.message));
 
