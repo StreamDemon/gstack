@@ -955,7 +955,13 @@ function addEntry(entry) {
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
-  return div.innerHTML;
+  // DOM text-node serialization escapes &, <, > but NOT " or '. Call sites
+  // that interpolate escapeHtml output inside an attribute value (title="...",
+  // data-x="...") need those escaped too or an attacker-controlled value can
+  // break out of the attribute. Add both manually.
+  return div.innerHTML
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ─── SSE Connection ─────────────────────────────────────────────
