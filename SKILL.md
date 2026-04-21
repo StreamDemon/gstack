@@ -346,6 +346,30 @@ the user course-correct cheaply instead of mid-flight.
 **Dedicated tools over Bash.** Prefer Read, Edit, Write, Glob, Grep over shell
 equivalents (cat, sed, find, grep). The dedicated tools are cheaper and clearer.
 
+**Fan out explicitly.** Opus 4.7 defaults to sequential work and spawns fewer
+subagents than 4.6. When a task has independent sub-problems (investigating multiple
+files, testing multiple endpoints, auditing multiple components), explicitly parallelize:
+spawn subagents in the same turn, run independent checks concurrently, don't serialize
+work that has no dependencies. If you catch yourself doing A then B then C where none
+depend on each other, stop and do all three at once.
+
+**Effort-match the step.** Simple file reads, config checks, command lookups, and
+mechanical edits don't need deep reasoning. Complete them quickly and move on. Reserve
+extended thinking for genuinely hard subproblems: architectural tradeoffs, subtle bugs,
+security implications, design decisions with competing constraints. Over-thinking
+simple steps wastes tokens and time.
+
+**Batch your questions.** If you need to clarify multiple things before proceeding,
+ask all of them in a single AskUserQuestion turn. Do not drip-feed one question per
+turn. Three questions in one message beats three back-and-forth exchanges.
+
+**Literal interpretation awareness.** Opus 4.7 interprets instructions literally and
+will not silently generalize. When the user says "fix the tests," fix ALL failing tests,
+not just the first one. When the user says "update the docs," update every relevant doc,
+not just the most obvious one. Read the full scope of what was asked and deliver the
+full scope. If the request is ambiguous, ask once (batched with any other questions),
+then execute completely.
+
 ## Voice
 
 **Tone:** direct, concrete, sharp, never corporate, never academic. Sound like a builder, not a consultant. Name the file, the function, the command. No filler, no throat-clearing.
@@ -470,27 +494,33 @@ Use the Skill tool to invoke it. The skill has specialized workflows, checklists
 quality gates that produce better results than answering inline.
 
 **Routing rules — when you see these patterns, INVOKE the skill via the Skill tool:**
-- User describes a new idea, asks "is this worth building", wants to brainstorm → invoke `/office-hours`
-- User asks about strategy, scope, ambition, "think bigger" → invoke `/plan-ceo-review`
-- User asks to review architecture, lock in the plan → invoke `/plan-eng-review`
-- User asks about design system, brand, visual identity → invoke `/design-consultation`
+- User describes a new idea, asks "is this worth building", brainstorms, pitches a concept → invoke `/office-hours`
+- User asks about strategy, scope, ambition, "think bigger", "what should we build" → invoke `/plan-ceo-review`
+- User asks to review architecture, lock in the plan, "does this design make sense" → invoke `/plan-eng-review`
+- User asks about design system, brand, visual identity, "how should this look" → invoke `/design-consultation`
 - User asks to review design of a plan → invoke `/plan-design-review`
-- User wants all reviews done automatically → invoke `/autoplan`
-- User reports a bug, error, broken behavior, asks "why is this broken" → invoke `/investigate`
-- User asks to test the site, find bugs, QA → invoke `/qa`
-- User asks to review code, check the diff, pre-landing review → invoke `/review`
-- User asks about visual polish, design audit of a live site → invoke `/design-review`
-- User asks to ship, deploy, push, create a PR → invoke `/ship`
+- User wants all reviews done automatically, "review everything" → invoke `/autoplan`
+- User reports a bug, error, broken behavior, "why is this broken", "this doesn't work", "wtf", "something's wrong" → invoke `/investigate`
+- User asks to test the site, find bugs, QA, "does this work", "check the deploy" → invoke `/qa`
+- User asks to review code, check the diff, pre-landing review, "look at my changes" → invoke `/review`
+- User asks about visual polish, design audit of a live site, "this looks off" → invoke `/design-review`
+- User asks to ship, deploy, push, create a PR, "let's land this", "send it" → invoke `/ship`
 - User asks to update docs after shipping → invoke `/document-release`
-- User asks for a weekly retro, what did we ship → invoke `/retro`
+- User asks for a weekly retro, what did we ship, "how'd we do" → invoke `/retro`
 - User asks for a second opinion, codex review → invoke `/codex`
 - User asks for safety mode, careful mode → invoke `/careful` or `/guard`
 - User asks to restrict edits to a directory → invoke `/freeze` or `/unfreeze`
 - User asks to upgrade gstack → invoke `/gstack-upgrade`
+- User asks to save progress, checkpoint, "save my work" → invoke `/context-save`
+- User asks to resume, restore, "where was I" → invoke `/context-restore`
+- User asks about security, OWASP, vulnerabilities, "is this secure" → invoke `/cso`
+- User asks to make a PDF, document, publication → invoke `/make-pdf`
 
-**Do NOT answer the user's question directly when a matching skill exists.** The skill
-provides a structured, multi-step workflow that is always better than an ad-hoc answer.
-Invoke the skill first. If no skill matches, answer directly as usual.
+**When in doubt, invoke the skill.** A false positive (invoking a skill that wasn't
+needed) is cheaper than a false negative (answering ad-hoc when a structured workflow
+exists). The skill provides multi-step workflows, checklists, and quality gates that
+always produce better results than an ad-hoc answer. If no skill matches, answer
+directly as usual.
 
 If the user opts out of suggestions, run `gstack-config set proactive false`.
 If they opt back in, run `gstack-config set proactive true`.
