@@ -1581,8 +1581,13 @@ async function start() {
       // Welcome page — served when GStack Browser launches in headed mode
       if (url.pathname === '/welcome') {
         const welcomePath = (() => {
-          // Check project-local designs first, then global
-          const slug = process.env.GSTACK_SLUG || 'unknown';
+          // Gate GSTACK_SLUG on a strict regex BEFORE interpolating it into
+          // the filesystem path. Without this, a slug like "../../etc/passwd"
+          // would resolve to ~/.gstack/projects/../../etc/passwd/... — path
+          // traversal.  Not exploitable today (attacker needs local env-var
+          // access), but the gate is one regex and buys us defense-in-depth.
+          const rawSlug = process.env.GSTACK_SLUG || 'unknown';
+          const slug = /^[a-z0-9_-]+$/.test(rawSlug) ? rawSlug : 'unknown';
           const homeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
           const projectWelcome = `${homeDir}/.gstack/projects/${slug}/designs/welcome-page-20260331/finalized.html`;
           if (fs.existsSync(projectWelcome)) return projectWelcome;

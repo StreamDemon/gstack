@@ -280,3 +280,17 @@ describe('Rate limit + denial log wiring', () => {
     expect(registrySrc).not.toMatch(/CONNECT_RATE_LIMIT\s*=\s*3\s*;/);
   });
 });
+
+describe('E3: /welcome GSTACK_SLUG path traversal gate', () => {
+  test('/welcome validates GSTACK_SLUG against ^[a-z0-9_-]+$ before interpolating into path', () => {
+    const welcomeBlock = sliceBetween(
+      SERVER_SRC,
+      "url.pathname === '/welcome'",
+      'if (fs.existsSync(projectWelcome)) return projectWelcome;'
+    );
+    // Must validate the slug before using it in a path
+    expect(welcomeBlock).toMatch(/\/\^\[a-z0-9_-\]\+\$\/\.test\(rawSlug\)/);
+    // Must fall back to a safe default when the slug fails validation
+    expect(welcomeBlock).toContain("'unknown'");
+  });
+});
