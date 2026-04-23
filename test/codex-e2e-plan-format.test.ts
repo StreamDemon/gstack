@@ -85,16 +85,17 @@ if (!SKIP) {
 }
 
 function recordCodexResult(testName: string, result: CodexResult, passed: boolean) {
-  if (!evalCollector) return;
-  const entry: EvalTestEntry = {
-    test: testName,
+  evalCollector?.addTest({
+    name: testName,
+    suite: 'codex-e2e-plan-format',
+    tier: 'e2e',
     passed,
-    cost: 0, // Codex cost not tracked here; inferred from tokens
-    tokens: result.tokens,
-    duration: Math.round(result.durationMs / 1000),
-    exitReason: result.exitCode === 0 ? 'success' : `exit_${result.exitCode}`,
-  };
-  evalCollector.record(entry);
+    duration_ms: result.durationMs,
+    cost_usd: 0, // Codex doesn't report cost in the same way; tokens tracked separately
+    output: result.output?.slice(0, 2000),
+    turns_used: result.toolCalls.length,
+    exit_reason: result.exitCode === 0 ? 'success' : `exit_code_${result.exitCode}`,
+  });
 }
 
 afterAll(async () => {
@@ -183,6 +184,7 @@ describeCodex('Codex Plan Format — CEO Mode Selection', () => {
       timeoutMs: 300_000,
       cwd: planDir,
       skillName: 'gstack-plan-ceo-review',
+      sandbox: 'workspace-write',
     });
 
     recordCodexResult('codex-plan-ceo-format-mode', result, result.exitCode === 0);
@@ -222,6 +224,7 @@ describeCodex('Codex Plan Format — CEO Approach Menu', () => {
       timeoutMs: 300_000,
       cwd: planDir,
       skillName: 'gstack-plan-ceo-review',
+      sandbox: 'workspace-write',
     });
 
     recordCodexResult('codex-plan-ceo-format-approach', result, result.exitCode === 0);
@@ -258,6 +261,7 @@ describeCodex('Codex Plan Format — Eng Coverage Issue', () => {
       timeoutMs: 300_000,
       cwd: planDir,
       skillName: 'gstack-plan-eng-review',
+      sandbox: 'workspace-write',
     });
 
     recordCodexResult('codex-plan-eng-format-coverage', result, result.exitCode === 0);
@@ -294,6 +298,7 @@ describeCodex('Codex Plan Format — Eng Kind Issue', () => {
       timeoutMs: 300_000,
       cwd: planDir,
       skillName: 'gstack-plan-eng-review',
+      sandbox: 'workspace-write',
     });
 
     recordCodexResult('codex-plan-eng-format-kind', result, result.exitCode === 0);
