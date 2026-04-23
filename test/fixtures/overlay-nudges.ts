@@ -39,6 +39,17 @@ export interface OverlayFixture {
   setupWorkspace: (dir: string) => void;
   /** The prompt the model receives. Non-empty. */
   userPrompt: string;
+  /** Per-fixture tool allowlist. Omit to use runner default [Read, Glob, Grep, Bash]. */
+  allowedTools?: string[];
+  /** Max turns per trial. Omit to use runner default (5). */
+  maxTurns?: number;
+  /**
+   * Direction of the expected effect. `higher_is_better` = overlay should
+   * increase the metric (e.g. fanout, files touched for literal scope).
+   * `lower_is_better` = overlay should decrease it (e.g. Bash count, turn count).
+   * Used only for cosmetic logging in the test output; `pass` is the actual gate.
+   */
+  direction?: 'higher_is_better' | 'lower_is_better';
   /** Compute the per-trial metric from the typed SDK result. */
   metric: (r: AgentSdkResult) => number;
   /** Acceptance predicate across all arms' per-trial metrics. */
@@ -118,6 +129,65 @@ export function fanoutPass(arms: { overlay: number[]; off: number[] }): boolean 
   const lift = mean(arms.overlay) - mean(arms.off);
   const floorHits = arms.overlay.filter((n) => n >= 2).length;
   return lift >= 0.5 && floorHits >= 3;
+}
+
+/**
+ * Generic "lower is better" pass predicate: overlay mean should drop the
+ * metric by at least 20% vs baseline. Used for nudges like "effort-match"
+ * (fewer turns) and "dedicated tools vs Bash" (fewer Bash calls).
+ */
+export function lowerIsBetter20Pct(arms: { overlay: number[]; off: number[] }): boolean {
+  const meanOff = mean(arms.off);
+  if (meanOff === 0) return mean(arms.overlay) <= meanOff;
+  return mean(arms.overlay) <= meanOff * 0.8;
+}
+
+/**
+ * Generic "higher is better" pass predicate: overlay mean should lift the
+ * metric by at least 20% vs baseline. Used for nudges like "literal
+ * interpretation" (more files touched when scope is ambiguous).
+ */
+export function higherIsBetter20Pct(arms: { overlay: number[]; off: number[] }): boolean {
+  const meanOff = mean(arms.off);
+  const meanOn = mean(arms.overlay);
+  if (meanOff === 0) return meanOn > 0;
+  return meanOn >= meanOff * 1.2;
+}
+
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+/**
+ * Count the total number of Bash tool_use blocks across ALL assistant turns.
+ * Signal for "dedicated tools over Bash" nudge in claude.md.
+ */
+export function bashToolCallCount(r: AgentSdkResult): number {
+  return r.toolCalls.filter((c) => c.tool === 'Bash').length;
+}
+
+/**
+ * Total turns the session used to complete. Signal for "effort-match the
+ * step" nudge in opus-4-7.md — trivial prompts should complete quickly.
+ */
+export function turnsToCompletion(r: AgentSdkResult): number {
+  return r.turnsUsed;
+}
+
+/**
+ * Count of unique files the model edited or wrote. Signal for "literal
+ * interpretation" nudge in opus-4-7.md — "fix the tests" with multiple
+ * failures should touch all of them.
+ */
+export function uniqueFilesEdited(r: AgentSdkResult): number {
+  const touched = new Set<string>();
+  for (const call of r.toolCalls) {
+    if (call.tool === 'Edit' || call.tool === 'Write' || call.tool === 'MultiEdit') {
+      const input = call.input as { file_path?: string } | null;
+      if (input?.file_path) touched.add(input.file_path);
+    }
+  }
+  return touched.size;
 }
 
 // ---------------------------------------------------------------------------
