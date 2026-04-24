@@ -14,6 +14,8 @@
  */
 
 import { describe, test, expect, afterEach } from 'bun:test';
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 const ROOT = path.resolve(import.meta.dir, '..');
@@ -407,6 +409,135 @@ describe('pooler-url', () => {
     });
     expect(r.status).toBe(2);
     expect(r.stderr).toContain('DB_PASS env var is required');
+  });
+});
+
+describe('list-orphans (D20)', () => {
+  const MOCK_PROJECTS = [
+    { ref: 'aaaaaaaaaaaaaaaaaaaa', name: 'gbrain', created_at: '2026-04-20', region: 'us-east-1' },
+    { ref: 'bbbbbbbbbbbbbbbbbbbb', name: 'gbrain-backup', created_at: '2026-04-21', region: 'us-east-1' },
+    { ref: 'cccccccccccccccccccc', name: 'my-production', created_at: '2026-04-15', region: 'us-west-2' },
+    { ref: 'dddddddddddddddddddd', name: 'gbrain', created_at: '2026-04-22', region: 'eu-west-1' },
+  ];
+
+  test('lists gbrain-prefixed projects that are NOT the active brain', async () => {
+    mock = startMock({
+      'GET /v1/projects': () => jsonResp(MOCK_PROJECTS),
+    });
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'gbrain-orphan-'));
+    // use top-level fs
+    fs.mkdirSync(path.join(home, '.gbrain'));
+    fs.writeFileSync(
+      path.join(home, '.gbrain', 'config.json'),
+      JSON.stringify({
+        engine: 'postgres',
+        // Active brain points at aaaaaaaaaaaaaaaaaaaa
+        database_url: 'postgresql://postgres.aaaaaaaaaaaaaaaaaaaa:pw@host:6543/postgres',
+      })
+    );
+    try {
+      const r = await runBin(['list-orphans', '--json'], {
+        SUPABASE_ACCESS_TOKEN: 'sbp_test',
+        SUPABASE_API_BASE: mock.url,
+        HOME: home,
+      });
+      expect(r.status).toBe(0);
+      const j = JSON.parse(r.stdout);
+      expect(j.active_ref).toBe('aaaaaaaaaaaaaaaaaaaa');
+      expect(j.orphans.length).toBe(2);
+      const refs = j.orphans.map((o: any) => o.ref).sort();
+      expect(refs).toEqual(['bbbbbbbbbbbbbbbbbbbb', 'dddddddddddddddddddd']);
+      // my-production is NOT in orphans — filtered out by gbrain prefix
+      expect(refs).not.toContain('cccccccccccccccccccc');
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test('treats all gbrain-prefixed projects as orphans when no active config exists', async () => {
+    mock = startMock({
+      'GET /v1/projects': () => jsonResp(MOCK_PROJECTS),
+    });
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'gbrain-no-cfg-'));
+    try {
+      const r = await runBin(['list-orphans', '--json'], {
+        SUPABASE_ACCESS_TOKEN: 'sbp_test',
+        SUPABASE_API_BASE: mock.url,
+        HOME: home,
+      });
+      expect(r.status).toBe(0);
+      const j = JSON.parse(r.stdout);
+      expect(j.active_ref).toBeNull();
+      // All 3 gbrain-prefixed projects are orphans when no active config
+      expect(j.orphans.length).toBe(3);
+    } finally {
+      // use top-level fs
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test('respects custom --name-prefix', async () => {
+    mock = startMock({
+      'GET /v1/projects': () =>
+        jsonResp([
+          { ref: 'aaaaaaaaaaaaaaaaaaaa', name: 'my-prefix-one', created_at: '2026-04-20' },
+          { ref: 'bbbbbbbbbbbbbbbbbbbb', name: 'gbrain', created_at: '2026-04-20' },
+        ]),
+    });
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'gbrain-prefix-'));
+    try {
+      const r = await runBin(['list-orphans', '--name-prefix', 'my-prefix', '--json'], {
+        SUPABASE_ACCESS_TOKEN: 'sbp_test',
+        SUPABASE_API_BASE: mock.url,
+        HOME: home,
+      });
+      const j = JSON.parse(r.stdout);
+      expect(j.orphans.length).toBe(1);
+      expect(j.orphans[0].name).toBe('my-prefix-one');
+    } finally {
+      // use top-level fs
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('delete-project (D20)', () => {
+  test('issues DELETE /v1/projects/<ref> and returns the deleted ref', async () => {
+    let deletedPath = '';
+    mock = startMock({
+      'DELETE /v1/projects/abcdefghijklmnopqrst': (req) => {
+        deletedPath = new URL(req.url).pathname;
+        return jsonResp({ id: 1, ref: 'abcdefghijklmnopqrst', name: 'gbrain' });
+      },
+    });
+    const r = await runBin(['delete-project', 'abcdefghijklmnopqrst', '--json'], {
+      SUPABASE_ACCESS_TOKEN: 'sbp_test',
+      SUPABASE_API_BASE: mock.url,
+    });
+    expect(r.status).toBe(0);
+    expect(deletedPath).toBe('/v1/projects/abcdefghijklmnopqrst');
+    const j = JSON.parse(r.stdout);
+    expect(j.deleted_ref).toBe('abcdefghijklmnopqrst');
+  });
+
+  test('surfaces 404 when the project does not exist', async () => {
+    mock = startMock({
+      'DELETE /v1/projects/nonexistent': () => jsonResp({ message: 'Project not found' }, 404),
+    });
+    const r = await runBin(['delete-project', 'nonexistent'], {
+      SUPABASE_ACCESS_TOKEN: 'sbp_test',
+      SUPABASE_API_BASE: mock.url,
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('404');
+  });
+
+  test('requires a ref', async () => {
+    const r = await runBin(['delete-project'], {
+      SUPABASE_ACCESS_TOKEN: 'sbp_test',
+    });
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('missing');
   });
 });
 
