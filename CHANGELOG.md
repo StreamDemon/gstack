@@ -1,5 +1,56 @@
 # Changelog
 
+## [1.11.0.0] - 2026-04-23
+
+## **Workspace-aware ship. Two open PRs can't both claim the same VERSION anymore.**
+
+If you run gstack in multiple Conductor windows at once, you've probably seen this: two branches bump to the same version, whoever merges second silently overwrites the first one's CHANGELOG entry or lands with a duplicate header, and nobody notices until a `grep "^## \["` later. This release makes that collision impossible by construction. `/ship` now queries the open PR queue, sees what versions are already claimed, and picks the next free slot at your chosen bump level. If a collision is detected between ship and land, the land step aborts and tells you to rerun `/ship` rather than silently overwriting. A new `/landing-report` command shows the whole queue on demand.
+
+### What changes for you
+
+Run `/ship` in one Conductor window while another has an open PR claiming v1.7.0.0. Your ship now sees the claim, renders a queue table, and picks the next free slot above it (same bump level). The PR title starts with `v<X.Y.Z.W>` so landing order is visible in `gh pr list` without opening each PR. If a sibling workspace has uncommitted work at a higher VERSION and looks active (commit in the last 24h), `/ship` asks whether to wait for them or advance past. If the queue shifts between ship and merge, CI's new version-gate catches it, and rerunning `/ship` rewrites VERSION, package.json, CHANGELOG, and the PR title atomically. This very release dogfooded the drift path: the original ship at v1.8.0.0 went stale when three other PRs landed first, and the merge-back-to-main rebump (v1.8.0.0 → v1.11.0.0) happened via the same queue-aware codepath it introduces.
+
+### What shipped (by the numbers)
+
+- `bin/gstack-next-version` — ~390-line Bun/TS util. 21 passing fixture tests covering happy path, 8 collision scenarios, offline fallback, fork-PR filtering, sibling activity detection, self-PR auto-exclusion.
+- Host parity: GitHub + GitLab both supported. CI gates: `.github/workflows/version-gate.yml`, `.github/workflows/pr-title-sync.yml`, plus `.gitlab-ci.yml` mirror.
+- Fail-open semantics on util errors (network, auth, bug). A gstack bug never freezes your merge queue. Fail-closed on confirmed collisions.
+- `/landing-report` skill — read-only dashboard showing queue, siblings, and what all four bump levels would claim.
+- `workspace_root` config key, default `$HOME/conductor/workspaces`, null disables sibling scan for non-Conductor users.
+
+### What this means for teams running parallel workspaces
+
+If you're routinely running 3-10 Conductor windows against the same repo, this is the capability that lets the model scale. Before: you mostly got away with it because you noticed collisions by eye. After: the queue is an observable surface, and the system refuses to ship a stale version. `/landing-report` is the new "where am I in line" check when you're about to open PR #6 for the day. Run it before `/ship` if you want to see what's coming without shipping.
+
+### Itemized changes
+
+#### Added
+
+- `bin/gstack-next-version`. Host-aware (GitHub + GitLab + unknown) VERSION allocator. Queries open PRs, fetches each PR's VERSION at head (bounded concurrency, 10 parallel), scans sibling Conductor worktrees, picks the next free slot. Pure reader, never writes files. Supports `--exclude-pr <N>` to filter out the PR being checked (prevents self-reference when CI runs against the PR's own VERSION).
+- `scripts/detect-bump.ts`, `scripts/compare-pr-version.ts`. CI gate helpers. Three exit paths: pass, block on confirmed collision, fail-open on util errors.
+- `.github/workflows/version-gate.yml`. Merge-time collision gate. Runs when VERSION/CHANGELOG/package.json changes on a PR.
+- `.github/workflows/pr-title-sync.yml`. Auto-rewrites PR title when VERSION changes on push, only for titles already carrying the `v<X.Y.Z.W>` prefix (custom titles left alone, idempotent).
+- `.gitlab-ci.yml`. GitLab CI parity. Both jobs mirrored with the same fail-open semantics.
+- `landing-report/SKILL.md.tmpl`. New `/landing-report` or `/gstack-landing-report` skill. Read-only dashboard.
+- `bin/gstack-config`. New `workspace_root` key. Default `$HOME/conductor/workspaces`, `null` disables sibling scan.
+
+#### Changed
+
+- `ship/SKILL.md.tmpl` Step 12. Queue-aware VERSION pick in FRESH path, drift detection in ALREADY_BUMPED path. On detected drift the user is prompted to rebump, which runs the full metadata path (VERSION + package.json + CHANGELOG header + PR title) atomically so nothing goes stale.
+- `ship/SKILL.md.tmpl` Step 19. PR title format is now `v<X.Y.Z.W> <type>: <summary>`, version ALWAYS first. Rerun path updates the title (not just the body) when VERSION changed. Both GitHub and GitLab paths.
+- `land-and-deploy/SKILL.md.tmpl`. New Step 3.4 pre-merge drift detection. Aborts with a clear rerun-/ship instruction rather than auto-mutating files. Rerunning `/ship` is the clean path because ship owns the full metadata flow.
+- `review/SKILL.md.tmpl`. New Step 3.4 advisory one-liner showing queue status. Non-blocking.
+- `CLAUDE.md`. Versioning invariant paragraph. Documents that VERSION is a monotonic sequence, not a strict semver commitment, and queue-advance within a bump level is permitted.
+
+#### Fixed
+
+- Self-reference bug in the version gate. The first live CI run (PR #1168 at v1.8.0.0) was rejected as "stale" because the util counted the PR being checked as a queued claim, inflating the next slot by one. Fixed with `--exclude-pr` flag + `gh pr view` auto-detect so the util silently filters the current branch's PR. Caught and fixed in the same ship — exactly the dogfood loop the release is designed for.
+
+#### For contributors
+
+- `test/gstack-next-version.test.ts`. 21 pure-function tests (parseVersion / bumpVersion / cmpVersion / pickNextSlot with 8 collision scenarios / markActiveSiblings 4 cases) plus a CLI smoke test against the live repo.
+- Golden ship fixtures refreshed for all three hosts (claude, codex, factory) after Step 12 and Step 19 template changes. This is exactly the blast radius Codex flagged during the CEO review (cross-model tension #8), handled in the same PR rather than as a follow-up.
+
 ## [1.10.1.0] - 2026-04-23
 
 ## **We tried to make Opus 4.7 faster with a prompt. Measurement said it got slower. Pulled the bullet.**
