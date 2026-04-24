@@ -92,6 +92,7 @@ export const E2E_TOUCHFILES: Record<string, string[]> = {
   'plan-devex-review-plan-mode':  ['plan-devex-review/**', 'scripts/resolvers/preamble/generate-plan-mode-handshake.ts', 'scripts/resolvers/preamble.ts', 'scripts/question-registry.ts', 'scripts/one-way-doors.ts', 'test/helpers/agent-sdk-runner.ts'],
   'plan-mode-no-op':              ['plan-ceo-review/**', 'scripts/resolvers/preamble/generate-plan-mode-handshake.ts', 'scripts/resolvers/preamble.ts', 'test/helpers/agent-sdk-runner.ts'],
   'e2e-harness-audit':            ['plan-ceo-review/**', 'plan-eng-review/**', 'plan-design-review/**', 'plan-devex-review/**', 'scripts/resolvers/preamble/generate-plan-mode-handshake.ts', 'test/helpers/agent-sdk-runner.ts'],
+  'brain-privacy-gate':           ['scripts/resolvers/preamble/generate-brain-sync-block.ts', 'scripts/resolvers/preamble.ts', 'bin/gstack-brain-sync', 'bin/gstack-brain-init', 'bin/gstack-config', 'test/helpers/agent-sdk-runner.ts'],
 
   // AskUserQuestion format regression (RECOMMENDATION + Completeness: N/10)
   // Fires when either template OR the two preamble resolvers change.
@@ -335,6 +336,10 @@ export const E2E_TIERS: Record<string, 'gate' | 'periodic'> = {
   'plan-devex-review-plan-mode': 'gate',
   'plan-mode-no-op': 'gate',
   'e2e-harness-audit': 'gate',
+
+  // Privacy gate for gstack-brain-sync — periodic (non-deterministic LLM call,
+  // costs ~$0.30-$0.50 per run, not needed on every commit)
+  'brain-privacy-gate': 'periodic',
 
   // AskUserQuestion format regression — periodic (Opus 4.7 non-deterministic benchmark)
   'plan-ceo-review-format-mode': 'periodic',
