@@ -675,6 +675,94 @@ body::after {
 }
 .tab-content.active { display: flex; flex-direction: column; }
 
+/* ─── Primary surface tabs (Terminal | Chat) ──────────────────── */
+.primary-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: #0f0f0f;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+.primary-tab {
+  background: transparent;
+  border: none;
+  color: #71717a;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.primary-tab:hover { color: #e5e5e5; }
+.primary-tab.active {
+  color: #e5e5e5;
+  border-bottom-color: #f59e0b;
+}
+
+/* ─── Terminal Tab ────────────────────────────────────────────── */
+#tab-terminal {
+  background: #0a0a0a;
+  padding: 0;
+}
+.terminal-bootstrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #71717a;
+  padding: 24px;
+}
+.terminal-bootstrap-icon {
+  font-size: 32px;
+  color: #f59e0b;
+  margin-bottom: 8px;
+}
+.terminal-bootstrap p { margin: 4px 0; }
+.terminal-install-card {
+  margin: 24px;
+  padding: 16px;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  text-align: center;
+}
+.terminal-install-card a { color: #f59e0b; }
+.install-retry-btn {
+  margin-top: 12px;
+  padding: 6px 14px;
+  background: #f59e0b;
+  color: #0a0a0a;
+  border: none;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.install-retry-btn:hover { opacity: 0.9; }
+.terminal-mount {
+  flex: 1;
+  width: 100%;
+  background: #0a0a0a;
+  padding: 8px;
+  box-sizing: border-box;
+}
+.terminal-mount .xterm,
+.terminal-mount .xterm .xterm-viewport,
+.terminal-mount .xterm .xterm-screen {
+  height: 100% !important;
+}
+.terminal-ended {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #71717a;
+  padding: 24px;
+}
+
 /* ─── Activity Feed ───────────────────────────────────── */
 #activity-feed { flex: 1; }
 

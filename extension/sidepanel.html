@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="sidepanel.css">
+  <link rel="stylesheet" href="lib/xterm.css">
 </head>
 <body>
   <!-- Security shield — reflects ~/.gstack/security/session-state.json status.
@@ -59,8 +60,37 @@
   <!-- Browser tab bar -->
   <div class="browser-tabs" id="browser-tabs" style="display:none"></div>
 
-  <!-- Chat Tab (default, full height) -->
-  <main id="tab-chat" class="tab-content active">
+  <!-- Primary surface tabs: Terminal (default) | Chat. Activity / Refs /
+       Inspector still exist as a separate debug-tabs strip below. The
+       Terminal tab is default-active per /plan-eng-review Issue 1B
+       (subsequently informed by codex's spawn-waste finding: PTY only
+       spawns when the user types, so default-active is cheap). -->
+  <nav class="primary-tabs" id="primary-tabs" role="tablist">
+    <button class="primary-tab active" role="tab" data-pane="terminal" aria-selected="true">Terminal</button>
+    <button class="primary-tab" role="tab" data-pane="chat" aria-selected="false">Chat</button>
+  </nav>
+
+  <!-- Terminal Tab (default-active) -->
+  <main id="tab-terminal" class="tab-content active" role="tabpanel" aria-label="Terminal">
+    <div class="terminal-bootstrap" id="terminal-bootstrap">
+      <div class="terminal-bootstrap-icon">▸</div>
+      <p id="terminal-bootstrap-status">Press any key to start Claude Code.</p>
+      <p class="muted" id="terminal-bootstrap-hint">Real PTY. Real terminal. Real claude.</p>
+    </div>
+    <div class="terminal-install-card" id="terminal-install-card" style="display:none">
+      <p><strong>Claude Code not found</strong></p>
+      <p class="muted">Install: <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank">docs.anthropic.com/en/docs/claude-code</a></p>
+      <button class="install-retry-btn" id="terminal-install-retry">I installed it &mdash; try again</button>
+    </div>
+    <div class="terminal-mount" id="terminal-mount" style="display:none"></div>
+    <div class="terminal-ended" id="terminal-ended" style="display:none">
+      <p>Session ended.</p>
+      <button class="install-retry-btn" id="terminal-restart">Start a new session</button>
+    </div>
+  </main>
+
+  <!-- Chat Tab (the existing claude -p one-shot chat path; preserved verbatim) -->
+  <main id="tab-chat" class="tab-content" role="tabpanel" aria-label="Chat">
     <div class="chat-messages" id="chat-messages">
       <div class="chat-loading" id="chat-loading">
         <div class="chat-loading-spinner"></div>
@@ -215,6 +245,9 @@
     <button class="tab close-debug" id="close-debug" title="Close debug">&times;</button>
   </nav>
 
+  <script src="lib/xterm.js"></script>
+  <script src="lib/xterm-addon-fit.js"></script>
   <script src="sidepanel.js"></script>
+  <script src="sidepanel-terminal.js"></script>
 </body>
 </html>

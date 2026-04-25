@@ -914,14 +914,22 @@ const debugTabs = document.getElementById('debug-tabs');
 const closeDebug = document.getElementById('close-debug');
 let debugOpen = false;
 
+// Resolve the primary surface tab the user expects to see when debug is
+// closed. Default-active is Terminal per /plan-eng-review Issue 1B.
+function activePrimaryPaneId() {
+  const sel = document.querySelector('.primary-tab.active');
+  const pane = sel?.dataset.pane;
+  return pane ? `tab-${pane}` : 'tab-terminal';
+}
+
 debugToggle.addEventListener('click', () => {
   debugOpen = !debugOpen;
   debugToggle.classList.toggle('active', debugOpen);
   debugTabs.style.display = debugOpen ? 'flex' : 'none';
   if (!debugOpen) {
-    // Close debug panels, show chat
+    // Close debug panels, restore the active primary surface (Terminal or Chat).
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.getElementById('tab-chat').classList.add('active');
+    document.getElementById(activePrimaryPaneId()).classList.add('active');
     document.querySelectorAll('.debug-tabs .tab').forEach(t => t.classList.remove('active'));
   }
 });
@@ -931,7 +939,7 @@ closeDebug.addEventListener('click', () => {
   debugToggle.classList.remove('active');
   debugTabs.style.display = 'none';
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.getElementById('tab-chat').classList.add('active');
+  document.getElementById(activePrimaryPaneId()).classList.add('active');
 });
 
 document.querySelectorAll('.debug-tabs .tab:not(.close-debug)').forEach(tab => {
@@ -942,6 +950,30 @@ document.querySelectorAll('.debug-tabs .tab:not(.close-debug)').forEach(tab => {
     document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
 
     if (tab.dataset.tab === 'refs') fetchRefs();
+  });
+});
+
+// Primary-tab switching: Terminal | Chat. Pure show/hide. Both panes keep
+// their state when hidden — switching to Chat doesn't kill the PTY, and
+// switching back to Terminal doesn't reset the chat scroll position.
+document.querySelectorAll('.primary-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.primary-tab').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const pane = btn.dataset.pane;
+    document.getElementById(`tab-${pane}`).classList.add('active');
+    // Close debug when switching primary tabs (debug is opt-in).
+    if (debugOpen) {
+      debugOpen = false;
+      debugToggle.classList.remove('active');
+      debugTabs.style.display = 'none';
+      document.querySelectorAll('.debug-tabs .tab').forEach(t => t.classList.remove('active'));
+    }
   });
 });
 
@@ -1660,6 +1692,16 @@ function updateConnection(url, token) {
   const wasConnected = !!serverUrl;
   serverUrl = url;
   serverToken = token || null;
+  // Expose for sidepanel-terminal.js (PTY surface). The terminal pane needs
+  // the bootstrap token to POST /pty-session and the port to derive the WS
+  // URL. We never expose the PTY token — it lives in an HttpOnly cookie.
+  if (url) {
+    try { window.gstackServerPort = parseInt(new URL(url).port, 10); } catch {}
+    window.gstackAuthToken = token || null;
+  } else {
+    window.gstackServerPort = null;
+    window.gstackAuthToken = null;
+  }
   if (url) {
     document.getElementById('footer-dot').className = 'dot connected';
     const port = new URL(url).port;
