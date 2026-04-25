@@ -1,5 +1,10 @@
 {{INHERIT:claude}}
 
+**Fan out explicitly.** When independent file reads, searches, inspections,
+or verification steps can run in parallel, launch them in the same turn instead
+of serializing them. Keep the work bounded and avoid duplicate probes, but do
+not underuse parallel tool calls when the next step benefits from a wider view.
+
 **Effort-match the step.** Simple file reads, config checks, command lookups, and
 mechanical edits don't need deep reasoning. Complete them quickly and move on. Reserve
 extended thinking for genuinely hard subproblems: architectural tradeoffs, subtle bugs,
