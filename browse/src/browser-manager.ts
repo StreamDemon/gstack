@@ -741,6 +741,80 @@ export class BrowserManager {
     return session;
   }
 
+  /** Get the underlying Page for a tab id. Returns null if the tab doesn't exist.
+   *  Used by the CDP bridge (cdp-bridge.ts) to mint per-tab CDPSessions. */
+  getPageForTab(tabId: number): Page | null {
+    return this.pages.get(tabId) ?? null;
+  }
+
+  // ─── Two-tier mutex (Codex T7) ─────────────────────────────
+  // Per-tab and global locks for the CDP bridge. tab-scoped methods take the
+  // per-tab mutex; browser-scoped methods take the global lock that blocks all
+  // tab mutexes. Hard timeout on acquire so silent deadlock can't happen.
+  // Every caller MUST use try { ... } finally { release() }.
+
+  private tabLocks: Map<number, Promise<void>> = new Map();
+  private globalCdpLockTail: Promise<void> = Promise.resolve();
+
+  /**
+   * Acquire the per-tab CDP lock with a timeout. Returns a release fn.
+   * Locks chain: each acquire waits on the prior tail's resolution.
+   * Browser-scoped global lock takes precedence: while the global lock is
+   * held, no tab lock can be acquired (and vice versa).
+   */
+  async acquireTabLock(tabId: number, timeoutMs: number): Promise<() => void> {
+    const existing = this.tabLocks.get(tabId) ?? Promise.resolve();
+    // Wait for any held global lock first (cross-tier serialization).
+    const tail = Promise.all([existing, this.globalCdpLockTail]).then(() => undefined);
+    let release!: () => void;
+    const next = new Promise<void>((resolve) => { release = resolve; });
+    this.tabLocks.set(tabId, tail.then(() => next));
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(
+        `CDPMutexAcquireTimeout: tab ${tabId} lock not acquired within ${timeoutMs}ms.\n` +
+        'Cause: a prior CDP or browser-scoped operation has held the lock too long.\n' +
+        'Action: retry; if this repeats, the prior operation may be hung — file a bug.'
+      )), timeoutMs),
+    );
+    try {
+      await Promise.race([tail, timeoutPromise]);
+    } catch (e) {
+      // Acquisition failed; release the slot we reserved so we don't deadlock the queue.
+      release();
+      throw e;
+    }
+    return release;
+  }
+
+  /**
+   * Acquire the global CDP lock. Blocks until all tab locks are released, and
+   * blocks new tab-lock acquisitions until released.
+   */
+  async acquireGlobalCdpLock(timeoutMs: number): Promise<() => void> {
+    const allTabTails = Array.from(this.tabLocks.values());
+    const priorGlobal = this.globalCdpLockTail;
+    const allPrior = Promise.all([priorGlobal, ...allTabTails]).then(() => undefined);
+    let release!: () => void;
+    const next = new Promise<void>((resolve) => { release = resolve; });
+    this.globalCdpLockTail = allPrior.then(() => next);
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(
+        `CDPMutexAcquireTimeout: global CDP lock not acquired within ${timeoutMs}ms.\n` +
+        'Cause: in-flight tab operations have not completed.\n' +
+        'Action: retry; if this repeats, file a bug — a tab op may be hung.'
+      )), timeoutMs),
+    );
+    try {
+      await Promise.race([allPrior, timeoutPromise]);
+    } catch (e) {
+      release();
+      throw e;
+    }
+    return release;
+  }
+
   // ─── Page Access (delegates to active session) ─────────────
   getPage(): Page {
     return this.getActiveSession().page;
