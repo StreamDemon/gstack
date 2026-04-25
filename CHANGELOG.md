@@ -20,6 +20,7 @@ This release adds the reverse of `/codex`: external hosts can now ask Claude for
 - `hosts/claude.ts`: excludes the Claude outside-voice skill from Claude-host generation.
 - `test/brain-sync.test.ts`: the `GSTACK_HOME` isolation test now snapshots and preserves the real config file instead of assuming local machine state.
 - `model-overlays/opus-4-7.md`: restores the fanout nudge expected by the Opus overlay regression test.
+- `claude/SKILL.md.tmpl`: uses `mktemp` for diff capture in review/challenge mode instead of a `$$`-based temp path, avoiding collisions across concurrent invocations.
 
 ### Changed
 

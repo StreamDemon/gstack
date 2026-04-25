@@ -1615,6 +1615,8 @@ describe('Codex generation (--host codex)', () => {
     const content = fs.readFileSync(path.join(AGENTS_DIR, 'gstack-claude', 'SKILL.md'), 'utf-8');
     expect(content).toContain('claude -p');
     expect(content).toContain('mktemp /tmp/gstack-claude-prompt-');
+    expect(content).toContain('mktemp /tmp/gstack-claude-diff-');
+    expect(content).not.toContain('/tmp/gstack-claude-diff-$$');
     expect(content).toContain('cat "$PROMPT_FILE" | claude -p');
     expect(content).toContain('--disable-slash-commands');
     expect(content).toContain('--tools ""');
