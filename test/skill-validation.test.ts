@@ -1670,30 +1670,8 @@ describe('no compiled binaries in git', () => {
   });
 });
 
-describe('sidebar agent (#584)', () => {
-  // #584 — Sidebar Write: sidebar-agent.ts allowedTools includes Write
-  test('sidebar-agent.ts allowedTools includes Write', () => {
-    const content = fs.readFileSync(path.join(ROOT, 'browse', 'src', 'sidebar-agent.ts'), 'utf-8');
-    // Find the allowedTools line in the askClaude function
-    const match = content.match(/--allowedTools['"]\s*,\s*['"]([^'"]+)['"]/);
-    expect(match).not.toBeNull();
-    expect(match![1]).toContain('Write');
-  });
-
-  // #584 — Server Write: server.ts allowedTools includes Write (DRY parity)
-  test('server.ts allowedTools excludes Write (agent is read-only + Bash)', () => {
-    const content = fs.readFileSync(path.join(ROOT, 'browse', 'src', 'server.ts'), 'utf-8');
-    // Find the sidebar allowedTools in the headed-mode path
-    const match = content.match(/--allowedTools['"]\s*,\s*['"]([^'"]+)['"]/);
-    expect(match).not.toBeNull();
-    expect(match![1]).toContain('Bash');
-    expect(match![1]).not.toContain('Write');
-  });
-
-  // #584 — Sidebar stderr: stderr handler is not empty
-  test('sidebar-agent.ts stderr handler is not empty', () => {
-    const content = fs.readFileSync(path.join(ROOT, 'browse', 'src', 'sidebar-agent.ts'), 'utf-8');
-    // The stderr handler should NOT be an empty arrow function
-    expect(content).not.toContain("proc.stderr.on('data', () => {})");
-  });
-});
+// `sidebar agent (#584)` describe block was here. sidebar-agent.ts and
+// the entire chat-queue path were ripped in favor of the interactive
+// claude PTY (terminal-agent.ts); these assertions had no target file.
+// Terminal-pane invariants are covered by browse/test/sidebar-tabs.test.ts
+// and browse/test/terminal-agent.test.ts.
