@@ -11,9 +11,9 @@
  * the question but the agent ignores the choice (e.g. always defaults
  * to EXPANSION) would not be caught by any prior test.
  *
- * Tier: periodic (not gate). Each run navigates 8-12 prior AUQs (telemetry,
+ * Tier: periodic (not gate). Each run navigates 8-12 prior AskUserQuestions (telemetry,
  * proactive, routing, vendoring, brain, office-hours, premise×3, approach)
- * before reaching Step 0F. At ~30s per AUQ that's a 4-6 min navigation
+ * before reaching Step 0F. At ~30s per AskUserQuestion that's a 4-6 min navigation
  * phase per case. The full 2-case suite runs ~12-15 min, $3-4. Too slow
  * for gate-tier; weekly is fine.
  *
@@ -57,20 +57,20 @@ const CASES: ModeCase[] = [
 ];
 
 /**
- * Navigate prior AUQs by picking option 1 until we hit an AUQ whose
+ * Navigate prior AskUserQuestions by picking option 1 until we hit an AskUserQuestion whose
  * options match one of the 4 mode names. Returns the option index
- * matching `targetMode`, with the buffer marker pointing AT that AUQ.
+ * matching `targetMode`, with the buffer marker pointing AT that AskUserQuestion.
  *
- * Throws if we don't reach the mode AUQ within `maxNav` prior AUQs or
+ * Throws if we don't reach the mode AskUserQuestion within `maxNav` prior AskUserQuestions or
  * the overall budget.
  */
-async function navigateToModeAuq(
+async function navigateToModeAskUserQuestion(
   session: ClaudePtySession,
   since: number,
   targetMode: ModeCase['mode'],
   opts: { maxNav?: number; budgetMs?: number } = {},
 ): Promise<{ modeIndex: number; visibleAtMode: string }> {
-  // /plan-ceo-review's mode AUQ (Step 0F) sits behind several preamble
+  // /plan-ceo-review's mode AskUserQuestion (Step 0F) sits behind several preamble
   // and Step 0A-0C-bis gates: telemetry, proactive, routing, vendoring,
   // brain privacy, office-hours offer, premise challenge (3 questions),
   // approach selection. 12 hops is the conservative ceiling.
@@ -100,12 +100,12 @@ async function navigateToModeAuq(
     if (sig === lastSig) continue;
     lastSeenList = opts;
 
-    // Is THIS the mode AUQ?
+    // Is THIS the mode AskUserQuestion?
     if (opts.some(o => MODE_RE.test(o.label))) {
       const target = opts.find(o => o.label.toUpperCase().includes(targetMode));
       if (!target) {
         throw new Error(
-          `Mode AUQ rendered but target "${targetMode}" not in option labels:\n` +
+          `Mode AskUserQuestion rendered but target "${targetMode}" not in option labels:\n` +
           opts.map(o => `  ${o.index}. ${o.label}`).join('\n'),
         );
       }
@@ -121,10 +121,10 @@ async function navigateToModeAuq(
       continue;
     }
 
-    // Not the mode AUQ — answer with option 1 (recommended) and continue.
+    // Not the mode AskUserQuestion — answer with option 1 (recommended) and continue.
     if (priorAnswered >= maxNav) {
       throw new Error(
-        `Navigated ${maxNav} prior AUQs without reaching the mode AUQ. ` +
+        `Navigated ${maxNav} prior AskUserQuestions without reaching the mode AskUserQuestion. ` +
         `Last list:\n${opts.map(o => `  ${o.index}. ${o.label}`).join('\n')}`,
       );
     }
@@ -133,7 +133,7 @@ async function navigateToModeAuq(
     // Give the agent a beat to advance before re-polling.
     await Bun.sleep(2000);
   }
-  throw new Error(`Mode AUQ not reached within ${budgetMs}ms`);
+  throw new Error(`Mode AskUserQuestion not reached within ${budgetMs}ms`);
 }
 
 describeE2E('/plan-ceo-review mode routing (gate)', () => {
@@ -150,13 +150,13 @@ describeE2E('/plan-ceo-review mode routing (gate)', () => {
           const since = session.mark();
           session.send('/plan-ceo-review\r');
 
-          const { modeIndex } = await navigateToModeAuq(session, since, c.mode);
+          const { modeIndex } = await navigateToModeAskUserQuestion(session, since, c.mode);
 
           // Snapshot the visible buffer at mode-pick time, then send the index.
           const sincePick = session.rawOutput().length;
           session.send(`${modeIndex}\r`);
 
-          // Wait for downstream evidence: either next AUQ or plan_ready or
+          // Wait for downstream evidence: either next AskUserQuestion or plan_ready or
           // a posture-distinctive substring shows up.
           const budgetMs = 240_000;
           const start = Date.now();
@@ -183,7 +183,7 @@ describeE2E('/plan-ceo-review mode routing (gate)', () => {
               isNumberedOptionListVisible(downstreamSnapshot) &&
               !c.postureRe.test(downstreamSnapshot)
             ) {
-              // Plan-ready AND a follow-up AUQ are both visible but
+              // Plan-ready AND a follow-up AskUserQuestion are both visible but
               // posture text has not appeared yet. Keep polling for a bit.
             }
           }

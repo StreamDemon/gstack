@@ -3,7 +3,7 @@
  *
  * Counterpart to the existing no-UI early-exit test. When the input plan
  * DOES describe UI changes, /plan-design-review must NOT early-exit and
- * must reach a real skill numbered-option AUQ (its first design-rating
+ * must reach a real skill numbered-option AskUserQuestion (its first design-rating
  * question), with the captured evidence NOT echoing the early-exit phrase.
  *
  * Why: today we only test the negative path (no-UI → early-exit). A
@@ -37,7 +37,7 @@ const FIXTURE = path.join(ROOT, 'test', 'fixtures', 'plans', 'ui-heavy-feature.m
 
 describeE2E('/plan-design-review with UI scope (gate)', () => {
   test(
-    'reaches a real skill AUQ (or plan_ready) without echoing the no-UI early-exit phrase',
+    'reaches a real skill AskUserQuestion (or plan_ready) without echoing the no-UI early-exit phrase',
     async () => {
       const fixtureRelPath = path.relative(ROOT, FIXTURE);
 
@@ -47,7 +47,7 @@ describeE2E('/plan-design-review with UI scope (gate)', () => {
         timeoutMs: 480_000,
       });
 
-      let outcome: 'real_auq' | 'plan_ready' | 'timeout' | 'exited' = 'timeout';
+      let outcome: 'real_question' | 'plan_ready' | 'timeout' | 'exited' = 'timeout';
       let evidence = '';
       let debugBuffer = ''; // captured at end so timeout error has data
 
@@ -86,13 +86,13 @@ describeE2E('/plan-design-review with UI scope (gate)', () => {
           // in visibleSince(since) and would otherwise re-trigger forever.
           const recentTail = visible.slice(-2500);
 
-          // Real skill AUQ visible (not a permission dialog)?
+          // Real skill AskUserQuestion visible (not a permission dialog)?
           if (
             isNumberedOptionListVisible(recentTail) &&
             parseNumberedOptions(recentTail).length >= 2 &&
             !isPermissionDialogVisible(recentTail)
           ) {
-            outcome = 'real_auq';
+            outcome = 'real_question';
             evidence = visible.slice(-3000);
             break;
           }
@@ -122,7 +122,7 @@ describeE2E('/plan-design-review with UI scope (gate)', () => {
         await session.close();
       }
 
-      // PASS: real_auq or plan_ready, AND evidence does NOT echo the
+      // PASS: real_question or plan_ready, AND evidence does NOT echo the
       // early-exit phrase.
       if (outcome === 'exited' || outcome === 'timeout') {
         throw new Error(

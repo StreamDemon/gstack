@@ -3,7 +3,7 @@
  *
  *   - parseNumberedOptions(visible)
  *       Parses `❯ 1.` / `  2.` numbered-option lines out of TTY text.
- *       Used by the AUQ format-compliance and mode-routing tests to look
+ *       Used by the AskUserQuestion format-compliance and mode-routing tests to look
  *       up an option index by its label without hard-coding positions.
  *
  *   - findBudgetRegressions / assertNoBudgetRegression(comparison)
@@ -117,7 +117,7 @@ describe('parseNumberedOptions', () => {
 
   test('anchors on LAST cursor when both stale and fresh fit in the tail', () => {
     // Both lists fit in the same 4KB tail (small buffer). The granted
-    // permission dialog options come first, the real AUQ comes second.
+    // permission dialog options come first, the real AskUserQuestion comes second.
     // We must return the FRESH options, not the STALE ones.
     const visible = [
       '❯ 1. STALE_grant',

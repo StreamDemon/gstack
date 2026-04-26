@@ -99,7 +99,7 @@ describeE2E('/autoplan chain ordering (periodic)', () => {
             const visible = session.visibleSince(since);
 
             // Auto-grant any permission dialog so autoplan can keep moving
-            // through its phases. The autoplan template auto-decides AUQs
+            // through its phases. The autoplan template auto-decides AskUserQuestions
             // it owns; only permission prompts (file/tool grants) need our
             // hand-pressing. Classify on tail to avoid stale matches.
             const recentTail = visible.slice(-1500);

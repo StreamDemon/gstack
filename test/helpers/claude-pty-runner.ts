@@ -143,7 +143,7 @@ export function isPlanReadyVisible(visible: string): boolean {
  * option list (so isNumberedOptionListVisible matches them) but they
  * are NOT a skill's AskUserQuestion — they're claude asking the user
  * whether to grant a tool/file permission. Tests that look for skill
- * AUQs must explicitly skip these.
+ * AskUserQuestions must explicitly skip these.
  *
  * Both English phrases below are stable across recent Claude Code
  * versions. The check is permissive on whitespace because TTY rendering
@@ -206,13 +206,13 @@ export function parseNumberedOptions(
   // visually reads "1. Option" can come through as "1.Option".
   const optionRe = /^[\s❯]*([1-9])\.\s*(\S.*?)\s*$/;
   // We anchor on the LATEST `❯ 1.` line in the buffer — the cursor marker
-  // for the active AUQ. Older numbered lists (e.g., a granted permission
+  // for the active AskUserQuestion. Older numbered lists (e.g., a granted permission
   // dialog still in scrollback) sit above it and must be ignored. Without
   // this, parseNumberedOptions returns stale options after the dialog is
   // dismissed.
   const lines = tail.split('\n');
   // Anchor on the LAST `❯ 1.` line (cursor is on option 1 of the active
-  // AUQ). Greedy character classes don't help here — we need a literal
+  // AskUserQuestion). Greedy character classes don't help here — we need a literal
   // `❯` after optional leading whitespace.
   let cursorLineIdx = -1;
   for (let i = lines.length - 1; i >= 0; i--) {

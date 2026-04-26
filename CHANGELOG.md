@@ -2,9 +2,9 @@
 
 ## [1.15.0.0] - 2026-04-26
 
-## **Skill prompts get a 25% haircut. Plan-mode E2E coverage doubles, and AUQ rendering is now testable.**
+## **Skill prompts get a 25% haircut. Plan-mode E2E coverage doubles, and AskUserQuestion rendering is now testable.**
 
-Three pieces of work in one release. First, every preamble resolver got compressed: 18 resolvers (Voice, Writing Style, AskUserQuestion Format, Completeness Principle, Plan Mode Info, Brain Sync, Routing Injection, and 11 more) lost a third of their prose without losing a single semantic rule. The full corpus of generated `SKILL.md` files dropped from 3.08 MB to 2.30 MB across 47 outputs. Second, the 5 plan-mode E2E tests added in v1.11.1.0 and rewritten in v1.12.1.0 turned out to have never actually passed — the SDK harness they used couldn't observe Claude's plan-mode confirmation UI. This release ships a real-PTY harness that drives the actual `claude` binary, watches the rendered terminal, and gets all 5 to green. Third, on top of that harness, 6 new E2E tests cover behaviors no test could reach before: AUQ format compliance, plan-design UI-scope detection (positive path), tool-budget regression, /ship idempotency end-to-end, /plan-ceo answer-routing, and /autoplan phase ordering.
+Three pieces of work in one release. First, every preamble resolver got compressed: 18 resolvers (Voice, Writing Style, AskUserQuestion Format, Completeness Principle, Plan Mode Info, Brain Sync, Routing Injection, and 11 more) lost a third of their prose without losing a single semantic rule. The full corpus of generated `SKILL.md` files dropped from 3.08 MB to 2.30 MB across 47 outputs. Second, the 5 plan-mode E2E tests added in v1.11.1.0 and rewritten in v1.12.1.0 turned out to have never actually passed — the SDK harness they used couldn't observe Claude's plan-mode confirmation UI. This release ships a real-PTY harness that drives the actual `claude` binary, watches the rendered terminal, and gets all 5 to green. Third, on top of that harness, 6 new E2E tests cover behaviors no test could reach before: AskUserQuestion format compliance, plan-design UI-scope detection (positive path), tool-budget regression, /ship idempotency end-to-end, /plan-ceo answer-routing, and /autoplan phase ordering.
 
 ### The numbers that matter
 
@@ -18,7 +18,7 @@ Token-level reduction comes from regenerating every `SKILL.md` against the slim 
 | Plan-mode E2E tests passing | 0/5 | 5/5 | +5 |
 | Plan-mode E2E wall time | ∞ (never green) | 790 s (sequential) | proven |
 | Real-PTY E2E test count | 5 | 11 | +6 |
-| Gate-tier paid E2E added | 0 | 3 | auq-format, design-with-ui, budget-regression |
+| Gate-tier paid E2E added | 0 | 3 | ask-user-question-format, design-with-ui, budget-regression |
 | Periodic-tier paid E2E added | 0 | 3 | mode-routing, ship-idempotency, autoplan-chain |
 | New helper unit tests | 0 | 23 | parser + budget regression coverage |
 
@@ -31,7 +31,7 @@ The biggest wins are the tier-≥3 plan reviews that load full preamble surface 
 
 ### What this means for builders
 
-Faster every-skill startup, cheaper prompt-cache pricing on cold reads, more headroom inside the 200K context window for actual work. The plan-mode E2E tests now actually verify the skill doesn't silently write a plan file when `/plan-ceo-review` runs in plan mode. And the 3 new gate-tier tests catch a class of regression that was previously invisible: AUQ format drift (`Recommendation:` line missing), UI-scope misdetection (positive path), and tool-call budget bloat (a skill burning 3× the tools it used to). Run `bun run gen:skill-docs --host all` after pulling. The 11 plan-mode tests will run in CI on the next gate-tier eval pass.
+Faster every-skill startup, cheaper prompt-cache pricing on cold reads, more headroom inside the 200K context window for actual work. The plan-mode E2E tests now actually verify the skill doesn't silently write a plan file when `/plan-ceo-review` runs in plan mode. And the 3 new gate-tier tests catch a class of regression that was previously invisible: AskUserQuestion format drift (`Recommendation:` line missing), UI-scope misdetection (positive path), and tool-call budget bloat (a skill burning 3× the tools it used to). Run `bun run gen:skill-docs --host all` after pulling. The 11 plan-mode tests will run in CI on the next gate-tier eval pass.
 
 ### Itemized changes
 
@@ -41,10 +41,10 @@ Faster every-skill startup, cheaper prompt-cache pricing on cold reads, more hea
 - `parseNumberedOptions(visible)` and `isPermissionDialogVisible(visible)` helpers in `claude-pty-runner.ts`. Tests can now look up an option index by its label without hard-coding positions, and auto-grant Claude Code's file-edit / workspace-trust / bash-permission dialogs that fire during preamble side-effects.
 - `findBudgetRegressions()` and `assertNoBudgetRegression()` in `test/helpers/eval-store.ts`. Pure functions returning tests that grew >2× in tools or turns vs the prior eval run, with floors at 5 prior tools / 3 prior turns to avoid noise. Env override `GSTACK_BUDGET_RATIO`.
 - 6 new real-PTY E2E tests on the harness:
-    - `skill-e2e-auq-format-compliance.test.ts` (gate, ~$0.50/run): asserts every gstack `AskUserQuestion` rendering contains the 7 mandated format elements (ELI10, Recommendation, Pros/Cons with ✅/❌, Net, `(recommended)` label).
+    - `skill-e2e-ask-user-question-format-compliance.test.ts` (gate, ~$0.50/run): asserts every gstack `AskUserQuestion` rendering contains the 7 mandated format elements (ELI10, Recommendation, Pros/Cons with ✅/❌, Net, `(recommended)` label).
     - `skill-e2e-plan-design-with-ui.test.ts` (gate, ~$0.80/run): positive coverage for `/plan-design-review` UI-scope detection. Counterpart to the existing no-UI early-exit test — without it, a regression that flips the detector to "early-exit always" would ship undetected.
     - `skill-budget-regression.test.ts` (gate, free): branch-scoped library-only assertion that no skill burns >2× tools or turns vs its prior recorded run.
-    - `skill-e2e-plan-ceo-mode-routing.test.ts` (periodic, ~$3/run): verifies AUQ answer routing — HOLD SCOPE picks routes to rigor language, SCOPE EXPANSION picks route to expansion language.
+    - `skill-e2e-plan-ceo-mode-routing.test.ts` (periodic, ~$3/run): verifies AskUserQuestion answer routing — HOLD SCOPE picks routes to rigor language, SCOPE EXPANSION picks route to expansion language.
     - `skill-e2e-ship-idempotency.test.ts` (periodic, ~$3/run): runs `/ship` end-to-end against a real git fixture with `STATE: ALREADY_BUMPED` baked in; asserts no double-bump, no double-commit, no fixture mutation.
     - `skill-e2e-autoplan-chain.test.ts` (periodic, ~$8/run): asserts `/autoplan` phase ordering by tee'ing timestamps as each `**Phase N complete.**` marker appears.
 - `test/helpers-unit.test.ts`: 23 unit tests covering `parseNumberedOptions` edge cases (empty, partial paint, >9 options, stale-vs-fresh anchoring) and `findBudgetRegressions` (noise floor, env override, missing tool data).
@@ -72,7 +72,7 @@ Faster every-skill startup, cheaper prompt-cache pricing on cold reads, more hea
 
 #### For contributors
 
-- `test/helpers/touchfiles.ts`: 5 plan-mode test selections + e2e-harness-audit selection now point at `claude-pty-runner.ts` instead of the deleted helper. 6 new entries (`auq-format-pty`, `plan-ceo-mode-routing`, `plan-design-with-ui-scope`, `budget-regression-pty`, `ship-idempotency-pty`, `autoplan-chain-pty`) with tier classifications: 3 gate, 3 periodic.
+- `test/helpers/touchfiles.ts`: 5 plan-mode test selections + e2e-harness-audit selection now point at `claude-pty-runner.ts` instead of the deleted helper. 6 new entries (`ask-user-question-format-pty`, `plan-ceo-mode-routing`, `plan-design-with-ui-scope`, `budget-regression-pty`, `ship-idempotency-pty`, `autoplan-chain-pty`) with tier classifications: 3 gate, 3 periodic.
 - `test/e2e-harness-audit.test.ts`: recognizes `runPlanSkillObservation` as a valid coverage path alongside the legacy `canUseTool` / `runPlanModeSkillTest` patterns.
 - New unit test: `test/gen-skill-docs.test.ts` asserts plan-review preambles stay under 33 KB and the slim Voice section preserves its load-bearing semantic contract (lead-with-the-point, name-the-file, user-outcome framing, no-corporate, no-AI-vocab, user-sovereignty).
 - `test/touchfiles.test.ts`: skill-specific change selection count updated 15 → 18 to match the 6 new touchfile entries that depend on `plan-ceo-review/**`.

@@ -16,12 +16,12 @@
  * Why real-PTY: the existing skill-e2e-plan-format tests cover what the
  * AGENT writes via the SDK (capture-to-file harness). This test covers
  * what the USER actually sees in the terminal — different bug class
- * (e.g., AUQ tool truncates long prose, conductor renderer mangles
+ * (e.g., AskUserQuestion tool truncates long prose, conductor renderer mangles
  * bullets, model collapses sections under token pressure). Two layers
  * of defense for a format-discipline regression that previously ate ~6
  * weeks of compliance drift before it was noticed.
  *
- * Trigger choice: /plan-ceo-review fires its mode-selection AUQ
+ * Trigger choice: /plan-ceo-review fires its mode-selection AskUserQuestion
  * deterministically and early (Step 0F), so we don't need to drive
  * through any prior questions to reach a format check.
  *
@@ -69,7 +69,7 @@ function findFormatGaps(visible: string): FormatGap[] {
 
 describeE2E('AskUserQuestion format compliance (gate)', () => {
   test(
-    'first AUQ from /plan-ceo-review contains all 7 mandated format elements',
+    'first AskUserQuestion from /plan-ceo-review contains all 7 mandated format elements',
     async () => {
       const session = await launchClaudePty({
         permissionMode: 'plan',
@@ -82,10 +82,10 @@ describeE2E('AskUserQuestion format compliance (gate)', () => {
         const since = session.mark();
         session.send('/plan-ceo-review\r');
 
-        // Wait for a SKILL AUQ. Strategy: poll the visible buffer until it
+        // Wait for a SKILL AskUserQuestion. Strategy: poll the visible buffer until it
         // contains both a numbered-option list AND the format markers we
         // expect (ELI10 + Recommendation). When both are present, it IS a
-        // real format-compliant AUQ — not a permission dialog or trust
+        // real format-compliant AskUserQuestion — not a permission dialog or trust
         // prompt.
         //
         // While polling, auto-grant any permission dialogs we see in the
@@ -94,7 +94,7 @@ describeE2E('AskUserQuestion format compliance (gate)', () => {
         const budgetMs = 300_000;
         const start = Date.now();
         let captured = '';
-        let auqVisible = false;
+        let askUserQuestionVisible = false;
         let lastPermSig = '';
         // Snapshot debug counters every poll so the timeout error shows
         // WHY we never matched (cursor-found vs markers-found discrepancy).
@@ -106,20 +106,20 @@ describeE2E('AskUserQuestion format compliance (gate)', () => {
           await Bun.sleep(2000);
           if (session.exited()) {
             throw new Error(
-              `claude exited (code=${session.exitCode()}) before AUQ rendered.\n` +
+              `claude exited (code=${session.exitCode()}) before AskUserQuestion rendered.\n` +
                 `Last visible:\n${session.visibleSince(since).slice(-2000)}`,
             );
           }
           const visible = session.visibleSince(since);
           // Marker check: anywhere in the post-slash region. Since `since`
           // is set right after sending /plan-ceo-review, there's no stale
-          // AUQ above this line — the only AUQ that can produce these
+          // AskUserQuestion above this line — the only AskUserQuestion that can produce these
           // markers is the current one.
           const hasEli10 = /ELI10\s*:/i.test(visible);
           const hasRecommend = /Recommendation\s*:/i.test(visible);
 
           // Cursor check: a numbered option list near the bottom of the
-          // buffer means the AUQ is currently rendered (not scrolled away).
+          // buffer means the AskUserQuestion is currently rendered (not scrolled away).
           const cursorTail = visible.slice(-4000);
           const hasCursor = isNumberedOptionListVisible(cursorTail) &&
                             parseNumberedOptions(cursorTail).length >= 2;
@@ -129,7 +129,7 @@ describeE2E('AskUserQuestion format compliance (gate)', () => {
 
           // Permission dialog branch: grant once per unique rendering, but
           // only when we don't already have format markers visible (so we
-          // don't accidentally grant a permission inside a real AUQ).
+          // don't accidentally grant a permission inside a real AskUserQuestion).
           if (
             hasCursor &&
             !(hasEli10 && hasRecommend) &&
@@ -144,18 +144,18 @@ describeE2E('AskUserQuestion format compliance (gate)', () => {
             }
           }
 
-          // Real AUQ check: cursor visible AND markers present anywhere in
+          // Real AskUserQuestion check: cursor visible AND markers present anywhere in
           // the post-slash region.
           if (hasCursor && hasEli10 && hasRecommend) {
             debugBothSeen++;
             captured = visible;
-            auqVisible = true;
+            askUserQuestionVisible = true;
             break;
           }
         }
-        if (!auqVisible) {
+        if (!askUserQuestionVisible) {
           throw new Error(
-            `AUQ not rendered within ${budgetMs}ms.\n` +
+            `AskUserQuestion not rendered within ${budgetMs}ms.\n` +
               `Debug counts: cursorSeen=${debugCursorSeen} markersSeen=${debugMarkersSeen} bothSeen=${debugBothSeen}\n` +
               `Last visible (4KB):\n${session.visibleSince(since).slice(-4000)}`,
           );
@@ -165,7 +165,7 @@ describeE2E('AskUserQuestion format compliance (gate)', () => {
           // Surface the captured text last 3KB on failure for debugging.
           const tail = captured.slice(-3000);
           throw new Error(
-            `AUQ format compliance FAILED — missing ${gaps.length} mandated field(s):\n` +
+            `AskUserQuestion format compliance FAILED — missing ${gaps.length} mandated field(s):\n` +
               gaps.map(g => `  - ${g.field} (regex: ${g.re.source})`).join('\n') +
               `\n--- captured (last 3KB) ---\n${tail}`,
           );
