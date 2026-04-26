@@ -1,14 +1,14 @@
 # Changelog
 
-## [1.13.1.0] - 2026-04-25
+## [1.15.0.0] - 2026-04-26
 
-## **Skill prompts get a 25% haircut. Plan-mode E2E tests work for the first time ever.**
+## **Skill prompts get a 25% haircut. Plan-mode E2E coverage doubles, and AUQ rendering is now testable.**
 
-Two pieces of work in one release. First, every preamble resolver got compressed: 18 resolvers (Voice, Writing Style, AskUserQuestion Format, Completeness Principle, Plan Mode Info, Brain Sync, Routing Injection, and 11 more) lost a third of their prose without losing a single semantic rule. The full corpus of generated `SKILL.md` files dropped from 3.08 MB to 2.30 MB across 47 outputs. Second, the 5 plan-mode E2E tests added in v1.11.1.0 and rewritten in v1.12.1.0 turned out to have never actually passed. The SDK harness they used couldn't observe Claude's plan-mode confirmation UI, so `result.askUserQuestions.length` was always 0. They fail on `origin/main`. They fail on v1.0.0.0. This release ships a real-PTY harness that drives the actual `claude` binary, watches the rendered terminal, and gets all 5 to green.
+Three pieces of work in one release. First, every preamble resolver got compressed: 18 resolvers (Voice, Writing Style, AskUserQuestion Format, Completeness Principle, Plan Mode Info, Brain Sync, Routing Injection, and 11 more) lost a third of their prose without losing a single semantic rule. The full corpus of generated `SKILL.md` files dropped from 3.08 MB to 2.30 MB across 47 outputs. Second, the 5 plan-mode E2E tests added in v1.11.1.0 and rewritten in v1.12.1.0 turned out to have never actually passed — the SDK harness they used couldn't observe Claude's plan-mode confirmation UI. This release ships a real-PTY harness that drives the actual `claude` binary, watches the rendered terminal, and gets all 5 to green. Third, on top of that harness, 6 new E2E tests cover behaviors no test could reach before: AUQ format compliance, plan-design UI-scope detection (positive path), tool-budget regression, /ship idempotency end-to-end, /plan-ceo answer-routing, and /autoplan phase ordering.
 
 ### The numbers that matter
 
-Token-level reduction comes from regenerating every `SKILL.md` against the slim resolvers (`bun run gen:skill-docs --host all`). Plan-mode E2E numbers come from `EVALS=1 EVALS_TIER=gate bun test test/skill-e2e-plan-*-plan-mode.test.ts` on a clean working tree.
+Token-level reduction comes from regenerating every `SKILL.md` against the slim resolvers (`bun run gen:skill-docs --host all`). Plan-mode E2E numbers come from `EVALS=1 EVALS_TIER=gate bun test test/skill-e2e-plan-*-plan-mode.test.ts` on a clean working tree. New E2E test verification uses the same gate flag against the new test files.
 
 | Metric | Before | After | Δ |
 |---|---|---|---|
@@ -17,23 +17,38 @@ Token-level reduction comes from regenerating every `SKILL.md` against the slim 
 | `plan-ceo-review` preamble | 54 KB | 31 KB | −43% |
 | Plan-mode E2E tests passing | 0/5 | 5/5 | +5 |
 | Plan-mode E2E wall time | ∞ (never green) | 790 s (sequential) | proven |
+| Real-PTY E2E test count | 5 | 11 | +6 |
+| Gate-tier paid E2E added | 0 | 3 | auq-format, design-with-ui, budget-regression |
+| Periodic-tier paid E2E added | 0 | 3 | mode-routing, ship-idempotency, autoplan-chain |
+| New helper unit tests | 0 | 23 | parser + budget regression coverage |
 
 | Skill class | Old preamble | New preamble | Δ |
 |---|---|---|---|
 | Tier-2+ review skills | ~50 KB | ~30 KB | −40% |
 | Tier-1 quick skills | ~12 KB | ~9 KB | −25% |
 
-The biggest wins are the tier-≥3 plan reviews that load full preamble surface (Brain Sync, Context Recovery, Routing Injection): they keep all the load-bearing functionality and lose almost half the bytes. Every gstack invocation is now ~50K tokens lighter.
+The biggest wins are the tier-≥3 plan reviews that load full preamble surface (Brain Sync, Context Recovery, Routing Injection): they keep all the load-bearing functionality and lose almost half the bytes. Every gstack invocation is now ~50K tokens lighter, and the test harness can finally observe what users actually see in the terminal.
 
 ### What this means for builders
 
-Faster every-skill startup, cheaper prompt-cache pricing on cold reads, more headroom inside the 200K context window for actual work. And for anyone who tried `/plan-ceo-review` in plan mode and watched it silently write a plan file: those tests now actually verify that doesn't happen. Run `bun run gen:skill-docs --host all` after pulling. The 5 plan-mode tests will run in CI on the next gate-tier eval pass.
+Faster every-skill startup, cheaper prompt-cache pricing on cold reads, more headroom inside the 200K context window for actual work. The plan-mode E2E tests now actually verify the skill doesn't silently write a plan file when `/plan-ceo-review` runs in plan mode. And the 3 new gate-tier tests catch a class of regression that was previously invisible: AUQ format drift (`Recommendation:` line missing), UI-scope misdetection (positive path), and tool-call budget bloat (a skill burning 3× the tools it used to). Run `bun run gen:skill-docs --host all` after pulling. The 11 plan-mode tests will run in CI on the next gate-tier eval pass.
 
 ### Itemized changes
 
 #### Added
 
 - `test/helpers/claude-pty-runner.ts`: real-PTY test harness using `Bun.spawn({terminal:})` (Bun 1.3.10+ has built-in PTY — no `node-pty`, no native modules). Exposes `launchClaudePty()` for raw session control and `runPlanSkillObservation()` as the high-level contract for plan-mode skill tests.
+- `parseNumberedOptions(visible)` and `isPermissionDialogVisible(visible)` helpers in `claude-pty-runner.ts`. Tests can now look up an option index by its label without hard-coding positions, and auto-grant Claude Code's file-edit / workspace-trust / bash-permission dialogs that fire during preamble side-effects.
+- `findBudgetRegressions()` and `assertNoBudgetRegression()` in `test/helpers/eval-store.ts`. Pure functions returning tests that grew >2× in tools or turns vs the prior eval run, with floors at 5 prior tools / 3 prior turns to avoid noise. Env override `GSTACK_BUDGET_RATIO`.
+- 6 new real-PTY E2E tests on the harness:
+    - `skill-e2e-auq-format-compliance.test.ts` (gate, ~$0.50/run): asserts every gstack `AskUserQuestion` rendering contains the 7 mandated format elements (ELI10, Recommendation, Pros/Cons with ✅/❌, Net, `(recommended)` label).
+    - `skill-e2e-plan-design-with-ui.test.ts` (gate, ~$0.80/run): positive coverage for `/plan-design-review` UI-scope detection. Counterpart to the existing no-UI early-exit test — without it, a regression that flips the detector to "early-exit always" would ship undetected.
+    - `skill-budget-regression.test.ts` (gate, free): branch-scoped library-only assertion that no skill burns >2× tools or turns vs its prior recorded run.
+    - `skill-e2e-plan-ceo-mode-routing.test.ts` (periodic, ~$3/run): verifies AUQ answer routing — HOLD SCOPE picks routes to rigor language, SCOPE EXPANSION picks route to expansion language.
+    - `skill-e2e-ship-idempotency.test.ts` (periodic, ~$3/run): runs `/ship` end-to-end against a real git fixture with `STATE: ALREADY_BUMPED` baked in; asserts no double-bump, no double-commit, no fixture mutation.
+    - `skill-e2e-autoplan-chain.test.ts` (periodic, ~$8/run): asserts `/autoplan` phase ordering by tee'ing timestamps as each `**Phase N complete.**` marker appears.
+- `test/helpers-unit.test.ts`: 23 unit tests covering `parseNumberedOptions` edge cases (empty, partial paint, >9 options, stale-vs-fresh anchoring) and `findBudgetRegressions` (noise floor, env override, missing tool data).
+- `test/fixtures/plans/ui-heavy-feature.md`: planted plan with explicit UI scope keywords for the new design-with-UI test.
 - Auto-handling of the workspace-trust dialog so tests run in temp directories without manual intervention.
 - Outcome contract: `asked` | `plan_ready` | `silent_write` | `exited` | `timeout`. Tests pass on `asked` or `plan_ready`, fail on the rest.
 
@@ -43,6 +58,7 @@ Faster every-skill startup, cheaper prompt-cache pricing on cold reads, more hea
 - All 47 generated `SKILL.md` files regenerated; 3 ship golden fixtures regenerated.
 - Plan-* skills retain full preamble surface (Brain Sync, Context Recovery, Routing Injection) — the early slim attempt that cut these was reverted after diagnosing them as load-bearing.
 - 5 plan-mode E2E tests rewritten on the new harness with a 300s observation budget.
+- `isNumberedOptionListVisible` regex tolerates whitespace collapse from TTY cursor-positioning escapes (`\x1b[40C`) which `stripAnsi` removes — `\b2\.` was failing on word-to-word transitions where stripped output read `text2.`.
 
 #### Fixed
 
@@ -56,9 +72,64 @@ Faster every-skill startup, cheaper prompt-cache pricing on cold reads, more hea
 
 #### For contributors
 
-- `test/helpers/touchfiles.ts`: 5 plan-mode test selections + e2e-harness-audit selection now point at `claude-pty-runner.ts` instead of the deleted helper.
+- `test/helpers/touchfiles.ts`: 5 plan-mode test selections + e2e-harness-audit selection now point at `claude-pty-runner.ts` instead of the deleted helper. 6 new entries (`auq-format-pty`, `plan-ceo-mode-routing`, `plan-design-with-ui-scope`, `budget-regression-pty`, `ship-idempotency-pty`, `autoplan-chain-pty`) with tier classifications: 3 gate, 3 periodic.
 - `test/e2e-harness-audit.test.ts`: recognizes `runPlanSkillObservation` as a valid coverage path alongside the legacy `canUseTool` / `runPlanModeSkillTest` patterns.
 - New unit test: `test/gen-skill-docs.test.ts` asserts plan-review preambles stay under 33 KB and the slim Voice section preserves its load-bearing semantic contract (lead-with-the-point, name-the-file, user-outcome framing, no-corporate, no-AI-vocab, user-sovereignty).
+- `test/touchfiles.test.ts`: skill-specific change selection count updated 15 → 18 to match the 6 new touchfile entries that depend on `plan-ceo-review/**`.
+
+## [1.14.0.0] - 2026-04-25
+
+## **The gstack browser sidebar is now an interactive Claude Code REPL with live tab awareness.**
+
+Open the side panel and Claude Code is right there in a real terminal. Type, watch the agent work, switch browser tabs and Claude sees the change. The old one-shot chat queue is gone. Two-way conversation, slash commands, `/resume`, ANSI colors, all of it. Plus a `$B tab-each` command that fans out a single browse command across every open tab and returns per-tab JSON results.
+
+### The numbers that matter
+
+| Metric | Before | After | Δ |
+|---|---|---|---|
+| Sidebar surfaces | Chat (one-shot `claude -p`) + 3 debug | Terminal (live PTY) + 3 debug | -1 surface, +interactive |
+| Subprocesses spawned per session | Many (one per chat message) | One (PTY claude, lazy-spawned) | -N |
+| Lines in `extension/sidepanel.js` | 1969 | 1042 | -47% |
+| Total diff | — | 27 files, +2875 / -3885 | -1010 net |
+| New unit + integration + regression tests | 0 | 56+ | +56 |
+| Live `tabs.json` push latency | n/a (no live state) | <50ms after `chrome.tabs` event | new capability |
+
+### What this means for builders
+
+Open the sidebar, type. Real PTY means slash commands, `/resume`, real ANSI rendering, real claude process lifecycle. Switch browser tabs while Claude is running and `<stateDir>/tabs.json` + `active-tab.json` update in place — Claude reads them, no need to ask `$B tabs`. Need to do the same thing on every tab? `$B tab-each <command>` returns a JSON array, original active tab restored when done, no OS focus stealing.
+
+The old chat queue is gone. `sidebar-agent.ts`, `/sidebar-command`, `/sidebar-chat`, `/sidebar-agent/event` all deleted. The Cleanup / Screenshot / Cookies toolbar buttons survive in the Terminal pane — Cleanup pipes its prompt straight into the live PTY via `window.gstackInjectToTerminal()` instead of spawning yet another `claude -p`.
+
+### Itemized changes
+
+#### Added
+
+- **Interactive Terminal sidebar tab.** xterm.js + a non-compiled `terminal-agent.ts` Bun process that spawns claude with `Bun.spawn({terminal: {rows, cols, data}})`. Auto-connects when the side panel opens, no keypress needed.
+- **`$B tab-each <command>`** — fan-out helper for multi-tab work. Returns `{command, args, total, results: [{tabId, url, title, status, output}]}`. Skips chrome:// pages, scope-checks the inner command before iterating, restores the original active tab in a `finally` block, never pulls focus away from the user's foreground app.
+- **Live tab state files.** `<stateDir>/tabs.json` (full list with id, url, title, active, pinned, audible, windowId) and `<stateDir>/active-tab.json` (current active). Updated atomically on every `chrome.tabs` event (activated, created, removed, URL/title change). Claude reads on demand instead of running `$B tabs`.
+- **Tab-awareness system prompt** injected via `claude --append-system-prompt` at spawn so the model knows about the state files and the `$B tab-each` command without being told.
+- **Always-visible Restart button** in the Terminal toolbar. Force-restart claude any time, not just from the "session ended" state.
+
+#### Changed
+- **Sidebar is Terminal-only.** No more `Terminal | Chat` primary tab nav. Activity / Refs / Inspector still live behind the `debug` toggle in the footer. Quick-actions (🧹 Cleanup / 📸 Screenshot / 🍪 Cookies) moved into the Terminal toolbar.
+- **WebSocket auth uses `Sec-WebSocket-Protocol`** instead of cookies. Browsers can't set `Authorization` on WS upgrades, and `SameSite=Strict` cookies don't survive the cross-port jump from server.ts:34567 to the agent's random port from a chrome-extension origin. The token rides on `new WebSocket(url, [`gstack-pty.<token>`])` and the agent echoes the protocol back (Chromium closes connections that don't pick a protocol).
+- **Cleanup button now drives the live PTY.** Clicking "🧹 Cleanup" injects the cleanup prompt straight into claude via `window.gstackInjectToTerminal()`. The Inspector "Send to Code" action uses the same path. No more `/sidebar-command` POSTs.
+- **Repaint after debug-tab close.** xterm.js doesn't auto-redraw when its container flips from `display: none` back to `display: flex`. A MutationObserver on `#tab-terminal`'s class attribute now forces a `fitAddon.fit() + term.refresh() + resize` push when the pane becomes visible.
+
+#### Removed
+- **`browse/src/sidebar-agent.ts`** — the one-shot `claude -p` queue worker. ~900 lines.
+- **Server endpoints**: `/sidebar-command`, `/sidebar-chat[/clear]`, `/sidebar-agent/{event,kill,stop}`, `/sidebar-tabs[/switch]`, `/sidebar-session{,/new,/list}`, `/sidebar-queue/dismiss`. ~600 lines.
+- **Chat-related state** in server.ts: `ChatEntry`, `SidebarSession`, `TabAgentState`, `pickSidebarModel`, `addChatEntry`, `processAgentEvent`, `killAgent`, the agent-health watchdog, `chatBuffer`, the per-tab agent map.
+- **Chat UI in sidepanel.html**: primary-tab nav, `<main id="tab-chat">`, the chat input bar, the experimental "Browser co-pilot" banner, the security event banner, the `clear-chat` footer button.
+- **Five obsolete test files**: `sidebar-agent.test.ts`, `sidebar-agent-roundtrip.test.ts`, `security-e2e-fullstack.test.ts`, `security-review-fullstack.test.ts`, `security-review-sidepanel-e2e.test.ts`. Plus 5 chat-only describe blocks inside surviving security tests (loadSession session-ID validation, switchChatTab DocumentFragment, pollChat reentrancy, sidebar-tabs URL sanitization, agent queue security).
+
+#### For contributors
+- **`browse/src/pty-session-cookie.ts`** mirrors `sse-session-cookie.ts`. Same TTL, same opportunistic pruning, separate registry (PTY tokens must never be valid as SSE tokens or vice versa).
+- **`docs/designs/SIDEBAR_MESSAGE_FLOW.md`** rewritten around the Terminal flow: WebSocket upgrade, dual-token model (`AUTH_TOKEN` for `/pty-session`, `gstack-pty.<token>` for `/ws`, `INTERNAL_TOKEN` for server↔agent loopback), threat-model boundary (Terminal tab bypasses the prompt-injection stack on purpose; user keystrokes are the trust source).
+- **`browse/test/terminal-agent.test.ts`** (16 tests) + `terminal-agent-integration.test.ts` (real `/bin/bash` PTY round-trip, raw `Sec-WebSocket-Protocol` upgrade verification) + `tab-each.test.ts` (10 tests with mock `BrowserManager`) + `sidebar-tabs.test.ts` (27 structural assertions locking the chat-rip invariants).
+- **CLAUDE.md** updated with the dual-token model, the cookie-vs-protocol rationale, and the cross-pane injection pattern.
+- **`vendor:xterm`** build step copies `xterm@5.x` and `xterm-addon-fit` from `node_modules/` into `extension/lib/` at build time. xterm files are gitignored.
+- **TODOS.md** carries three v1.1+ follow-ups: PTY session survival across sidebar reload (Issue 1C deferred), `/health` `AUTH_TOKEN` distribution audit (codex finding, pre-existing soft leak), and dropping the now-dead `security-classifier.ts` ML pipeline.
 
 ## [1.13.0.0] - 2026-04-25
 
